@@ -6,11 +6,13 @@
 # @Link   :
 # @Date   : 11/26/2021, 9:49:38 AM
 
-import logging
-from abc import ABCMeta, abstractmethod
+import sys
+sys.path.append('lib\\sim_access')
 
-import serial
 import six
+import serial
+from abc import ABCMeta, abstractmethod
+import logging
 
 
 logger = logging.getLogger(__name__)
@@ -39,6 +41,7 @@ class AdapterBase(object):
 class SerialAdapter(AdapterBase):
     ''' Python Serial
     '''
+
     def __init__(self, COM, baud=115200):
         self.__port = serial.Serial(COM, baudrate=baud, timeout=0.05)
 
@@ -62,9 +65,11 @@ class SerialAdapter(AdapterBase):
     def available(self):
         return self.__port.in_waiting
 
+
 class MAPS6Adapter(AdapterBase):
     ''' MAPS6 Serial
     '''
+
     def __init__(self, COM, baud=115200):
         self.__port = serial.Serial(COM, baudrate=baud, timeout=2.0)
 

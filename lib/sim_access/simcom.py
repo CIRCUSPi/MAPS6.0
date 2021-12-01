@@ -6,12 +6,15 @@
 # @Link   :
 # @Date   : 11/26/2021, 10:05:20 AM
 
-import logging
-import time
-import re
+import sys
+sys.path.append('lib\\sim_access')
 
-from adapter import AdapterBase, SerialAdapter
 from ATCommands import ATCommands
+from adapter import AdapterBase, SerialAdapter
+import re
+import time
+import logging
+
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +49,7 @@ class SIMModuleBase(object):
         done = False
         counter = 0
         msgs = []
-        timeout = time.time() + (timeout/1000)
+        timeout = time.time() + (timeout / 1000)
         while done == False and time.time() < timeout:
             line = self.adapter.readline()
             line = line.decode()
@@ -79,7 +82,7 @@ class SIMModuleBase(object):
         '''
         tmp = ATCommands.shut_PDP()
         self.adapter.write(tmp.encode())
-        self.wait_key('SHUT OK\r\n',15000)
+        self.wait_key('SHUT OK\r\n', 15000)
 
     def network_getapn(self):
         ''' get apn

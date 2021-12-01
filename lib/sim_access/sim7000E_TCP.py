@@ -6,11 +6,15 @@
 # @Link   :
 # @Date   : 11/26/2021, 4:03:34 PM
 
-import logging
-from simcom import SIMModuleBase
-from adapter import AdapterBase, SerialAdapter
-from ATCommands import ATCommands
+import sys
+sys.path.append('lib\\sim_access')
+
 import re
+from ATCommands import ATCommands
+from adapter import AdapterBase, SerialAdapter
+from simcom import SIMModuleBase
+import logging
+
 
 logger = logging.getLogger(__name__)
 
