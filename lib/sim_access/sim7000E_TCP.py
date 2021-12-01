@@ -7,7 +7,6 @@
 # @Date   : 11/26/2021, 4:03:34 PM
 
 import logging
-from adapter import SerialAdapter
 from simcom import SIMModuleBase
 from adapter import AdapterBase, SerialAdapter
 from ATCommands import ATCommands
@@ -26,12 +25,12 @@ class SIM7000E_TPC(SIMModuleBase):
             except Exception as e:
                 error = str(e)
                 if(error == 'No reply'):
-                    logging.info('module No reply, reset module ...')
+                    logger.info('module No reply, reset module ...')
                     raise Exception('reset module')
                 elif(error == 'module not ready'):
-                    logging.info('module not ready, please wait ...')
+                    logger.info('module not ready, please wait ...')
                 else:
-                    logging.error('Unknown exception: {}'.format(error))
+                    logger.error('Unknown exception: {}'.format(error))
                     raise Exception('Unknown exception')
 
     def connect(self, ip, port):
@@ -49,11 +48,11 @@ class SIM7000E_TPC(SIMModuleBase):
                 self.adapter.write(tmp.encode())
                 self.wait_ok()
                 apn = self.network_getapn()
-                logging.debug('APN: {}'.format(apn))
+                logger.debug('APN: {}'.format(apn))
                 self.network_setapn(apn)
                 self.network_bringup()
                 local_ip = self.network_ipaddr()
-                logging.debug('local ip: '.format(local_ip))
+                logger.debug('local ip: '.format(local_ip))
                 tmp = ATCommands.tcp_connect(ip, port)
                 self.adapter.write(tmp.encode())
                 self.wait_key('CONNECT OK\r\n', timeout=800000)
@@ -61,14 +60,14 @@ class SIM7000E_TPC(SIMModuleBase):
             except Exception as e:
                 error = str(e)
                 if(error == 'No reply'):
-                    logging.warning('reset module ...')
+                    logger.warning('reset module ...')
                     raise Exception('reset module')
                 elif(error == 'Failed'):
-                    logging.warning('module response error, try again ...')
+                    logger.warning('module response error, try again ...')
                 else:
-                    logging.error('Unknown exception: {}'.format(error))
+                    logger.error('Unknown exception: {}'.format(error))
                     raise Exception('Unknown exception')
-        logging.info('TCP is Connected.')
+        logger.info('TCP is Connected.')
 
     def disconnect(self):
         ''' Disconnect TCP socket
@@ -80,14 +79,14 @@ class SIM7000E_TPC(SIMModuleBase):
             except Exception as e:
                 error = str(e)
                 if(error == 'No reply'):
-                    logging.warning('reset module ...')
+                    logger.warning('reset module ...')
                     raise Exception('reset module')
                 elif(error == 'Failed'):
-                    logging.warning('module response error, try again ...')
+                    logger.warning('module response error, try again ...')
                 else:
-                    logging.error('Unknown exception: {}'.format(error))
+                    logger.error('Unknown exception: {}'.format(error))
                     raise Exception('Unknown exception')
-        logging.info('TCP is Disconnected.')
+        logger.info('TCP is Disconnected.')
 
     def sendData(self, data):
         ''' Send packets via TCP Socket
@@ -104,14 +103,14 @@ class SIM7000E_TPC(SIMModuleBase):
             except Exception as e:
                 error = str(e)
                 if(error == 'No reply'):
-                    logging.warning('reset module ...')
+                    logger.warning('reset module ...')
                     raise Exception('reset module')
                 elif(error == 'Failed'):
-                    logging.warning('module response error, try again ...')
+                    logger.warning('module response error, try again ...')
                 else:
-                    logging.error('Unknown exception: {}'.format(error))
+                    logger.error('Unknown exception: {}'.format(error))
                     raise Exception('Unknown exception')
-        logging.info('TCP send success.')
+        logger.info('TCP send success.')
 
     def available(self):
         ''' Return the length of the TCP Socket receiving buffer
@@ -126,18 +125,18 @@ class SIM7000E_TPC(SIMModuleBase):
                     if(re_result):
                         assert len(re_result.groups()) == 1
                         data_len = re_result.group(1)
-                        logging.info('data available {} byte'.format(data_len))
+                        logger.debug('data available {} byte'.format(data_len))
                         return int(data_len)
                 assert Exception('The response exceeded expectations')
             except Exception as e:
                 error = str(e)
                 if(error == 'No reply'):
-                    logging.warning('reset module ...')
+                    logger.warning('reset module ...')
                     raise Exception('reset module')
                 elif(error == 'Failed'):
-                    logging.warning('module response error, try again ...')
+                    logger.warning('module response error, try again ...')
                 else:
-                    logging.error('Unknown exception: {}'.format(error))
+                    logger.error('Unknown exception: {}'.format(error))
                     raise Exception('Unknown exception')
 
     def readData(self, data_len):
@@ -156,8 +155,8 @@ class SIM7000E_TPC(SIMModuleBase):
                     if(re_result):
                         assert len(re_result.groups()) == 1
                         cnf_len = re_result.group(1)
-                        logging.info('read {} byte'.format(data_len))
-                        logging.debug('cnflength {} byte'.format(cnf_len))
+                        logger.debug('read {} byte'.format(data_len))
+                        logger.debug('cnflength {} byte'.format(cnf_len))
                         data = msgs[idx + 1]
                         re_result = re.search('\w+', data)
                         if(re_result):
@@ -167,17 +166,17 @@ class SIM7000E_TPC(SIMModuleBase):
             except Exception as e:
                 error = str(e)
                 if(error == 'No reply'):
-                    logging.warning('reset module ...')
+                    logger.warning('reset module ...')
                     raise Exception('reset module')
                 elif(error == 'Failed'):
-                    logging.warning('module response error, try again ...')
+                    logger.warning('module response error, try again ...')
                 else:
-                    logging.error('Unknown exception: {}'.format(error))
+                    logger.error('Unknown exception: {}'.format(error))
                     raise Exception('Unknown exception')
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG,
+    logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -192,20 +191,20 @@ if __name__ == '__main__':
         available_data_len = 0
         while(available_data_len == 0):
             available_data_len = tcp.available()
-        logging.debug('mqtt connect receive data {} byte'.format(available_data_len))
+        print('mqtt connect receive data {} byte'.format(available_data_len))
         data = tcp.readData(4)
-        logging.debug('mqtt connect receive data: {}'.format(data))
+        print('mqtt connect receive data: {}'.format(data))
 
         tcp.sendData(mqtt_publish_pkg_qos1)
         available_data_len = 0
         while(available_data_len == 0):
             available_data_len = tcp.available()
-        logging.debug('mqtt publish receive data {} byte'.format(available_data_len))
+        print('mqtt publish receive data {} byte'.format(available_data_len))
         data = tcp.readData(4)
-        logging.debug('mqtt publish receive data: {}'.format(data))
+        print('mqtt publish receive data: {}'.format(data))
 
         tcp.sendData(mqtt_publish_pkg_qos0)
         tcp.disconnect()
     except Exception as e:
         error = str(e)
-        logging.debug(error)
+        print(error)

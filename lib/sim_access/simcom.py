@@ -37,7 +37,7 @@ class SIMModuleBase(object):
         self.adapter.write(tmp.encode())
         self.wait_ok()
         while(not self.network_chkAttach()):
-            logging.info('Wait Connect to BS ...')
+            logger.info('Wait Connect to BS ...')
 
     def wait_ok(self):
         return self.wait_key('OK\r\n')
@@ -170,7 +170,7 @@ if __name__ == '__main__':
         while(not sim.network_chkAttach()):
             print('wait connect bs...')
         rssi = sim.network_getCsq()
-        print(rssi)
+        print('CSQ: {}'.format(rssi))
         sim.network_Deact_PDP()
         apn = sim.network_getapn()
         sim.network_setapn(apn)
@@ -180,4 +180,4 @@ if __name__ == '__main__':
         sim.network_Deact_PDP()
     except Exception as e:
         error = str(e)
-        logging.debug(error)
+        print(error)
