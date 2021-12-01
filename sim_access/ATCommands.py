@@ -123,7 +123,19 @@ class ATCommands(object):
 
     @classmethod
     def tcp_readData(cls, len):
+        ''' output data can not exceed 1460 bytes at a time.
+        '''
         return atset('CIPRXGET', True) + '2,{}\r\n'.format(len)
+    
+    @classmethod
+    def tcp_readHEXData(cls, len):
+        ''' output data can not exceed 730 bytes at a time.
+        '''
+        return atset('CIPRXGET', True) + '3,{}\r\n'.format(len)
+
+    @classmethod
+    def tcp_setTxHex(cls):
+        return atset('CIPSENDHEX', True) + '1\r\n'
 
 
 if __name__ == '__main__':

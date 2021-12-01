@@ -40,7 +40,7 @@ class SerialAdapter(AdapterBase):
     ''' Python Serial
     '''
     def __init__(self, COM, baud=115200):
-        self.__port = serial.Serial(COM, baudrate=baud, timeout=2.0)
+        self.__port = serial.Serial(COM, baudrate=baud, timeout=0.05)
 
     def read(self, size=0):
         if size == 0:
