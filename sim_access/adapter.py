@@ -7,8 +7,6 @@
 # @Date   : 11/26/2021, 9:49:38 AM
 
 import logging
-import sys
-import time
 from abc import ABCMeta, abstractmethod
 
 import serial
@@ -39,9 +37,36 @@ class AdapterBase(object):
 
 
 class SerialAdapter(AdapterBase):
-
+    ''' Python Serial
+    '''
     def __init__(self, COM, baud=115200):
-        self.__port = serial.Serial(COM, baudrate=baud, timeout=3.0)
+        self.__port = serial.Serial(COM, baudrate=baud, timeout=2.0)
+
+    def read(self, size=0):
+        if size == 0:
+            data = self.__port.read_all()
+        else:
+            data = self.__port.read(size)
+        return data
+
+    def readline(self):
+        data = self.__port.readline()
+        logger.debug('<' + data.decode())
+        return data
+
+    def write(self, data):
+        assert isinstance(data, bytes)
+        logger.debug('>' + data.decode())
+        self.__port.write(data)
+
+    def available(self):
+        return self.__port.in_waiting
+
+class MAPS6Adapter(AdapterBase):
+    ''' MAPS6 Serial
+    '''
+    def __init__(self, COM, baud=115200):
+        self.__port = serial.Serial(COM, baudrate=baud, timeout=2.0)
 
     def read(self, size=0):
         if size == 0:

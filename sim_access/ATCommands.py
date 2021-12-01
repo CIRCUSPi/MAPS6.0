@@ -6,6 +6,9 @@
 # @Link   :
 # @Date   : 11/26/2021, 4:11:14 PM
 
+import binascii
+
+
 def ucs2encode(text):
     if text is None or text == '':
         return ''
@@ -77,3 +80,59 @@ class ATCommands(object):
     @classmethod
     def get_apn(cls):
         return atcmd('CGNAPN', True) + '\r\n'
+
+    @classmethod
+    def read_network_attach(cls):
+        return atread('CGATT', True) + '\r\n'
+
+    @classmethod
+    def shut_PDP(cls):
+        return atcmd('CIPSHUT', True) + '\r\n'
+
+    @classmethod
+    def tcp_connect(cls, ip, port):
+        return atset('CIPSTART', True) + '\"TCP\",\"{}\",{}\r\n'.format(str(ip), str(port))
+
+    @classmethod
+    def tcp_status(cls):
+        return atcmd('CIPSTATUS', True) + '\r\n'
+
+    @classmethod
+    def csq(cls):
+        return atcmd('CSQ', True) + '\r\n'
+
+    @classmethod
+    def tcp_send(cls, dataLen):
+        return atset('CIPSEND', True) + '{}\r\n'.format(str(dataLen))
+
+    @classmethod
+    def tcp_close(cls):
+        return atcmd('CIPCLOSE', True) + '\r\n'
+
+    @classmethod
+    def tcp_send_ack(cls):
+        return atcmd('CIPACK', True) + '\r\n'
+
+    @classmethod
+    def tcp_setRxGet_Manual(cls):
+        return atset('CIPRXGET', True) + '1\r\n'
+
+    @classmethod
+    def tcp_chkData(cls):
+        return atset('CIPRXGET', True) + '4\r\n'
+
+    @classmethod
+    def tcp_readData(cls, len):
+        return atset('CIPRXGET', True) + '2,{}\r\n'.format(len)
+
+
+if __name__ == '__main__':
+    import inspect
+    attrs = (getattr(ATCommands, name) for name in dir(ATCommands))
+    methods = filter(inspect.ismethod, attrs)
+    for method in methods:
+        try:
+            print(method())
+        except TypeError:
+            # Can't handle methods with required arguments.
+            pass
