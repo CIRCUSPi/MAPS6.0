@@ -35,7 +35,7 @@ class SIM7000E_TPC(SIMModuleBase):
                     logger.info('module not ready, please wait ...')
                 else:
                     logger.error('Unknown exception: {}'.format(error))
-                    raise Exception('Unknown exception')
+                    raise Exception('Unknown exception: {}'.format(error))
 
     def connect(self, ip, port):
         ''' Connect TCP socket
@@ -166,6 +166,34 @@ class SIM7000E_TPC(SIMModuleBase):
                         if(re_result):
                             return re_result.group()
                         return ''
+                assert Exception('The response exceeded expectations')
+            except Exception as e:
+                error = str(e)
+                if(error == 'No reply'):
+                    logger.warning('reset module ...')
+                    raise Exception('reset module')
+                elif(error == 'Failed'):
+                    logger.warning('module response error, try again ...')
+                else:
+                    logger.error('Unknown exception: {}'.format(error))
+                    raise Exception('Unknown exception')
+
+    def connected(self):
+        ''' Check TCP is connected
+        '''
+        while(True):
+            try:
+                tmp = ATCommands.tcp_status()
+                self.adapter.write(tmp.encode())
+                msgs = self.wait_key('STATE: ')
+                for msg in msgs:
+                    re_result = re.search('STATE: ([A-Z]+)', msg)
+                    if(re_result):
+                        assert len(re_result.groups()) == 1
+                        status = re_result.group(1)
+                        logger.debug('tcp status: {}'.format(status))
+                        logger.info('TCP Status: {}'.format(status))
+                        return (status == 'CONNECT OK')
                 assert Exception('The response exceeded expectations')
             except Exception as e:
                 error = str(e)
