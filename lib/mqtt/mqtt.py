@@ -319,6 +319,7 @@ class MQTT(SIM7000E_TPC):
                 packet = MQTT_CONTROL_TYPE_PACKET_PINGREQ + '00'
                 logger.debug(packet)
                 self.tcp.sendData(packet)
+                logger.info('pingReq')
                 # Wait Response
                 # 3.13 PINGRESP – PING response
                 return (self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_PINGRESP + '00'))
@@ -339,11 +340,19 @@ class MQTT(SIM7000E_TPC):
                 logger.info('Not receive ping response, TCP Disconnecting...')
                 self.tcp.disconnect()
         # Handle temp buffer
-        for buff in self.buffer:
-            topic_len = int(buff[:4], 16)
-            topic = self.__hexStrToStr(buff[4:4 + (topic_len * 2)])
-            # TODO: Check qos, read identifier, read msg
-            # TODO: Call callback
+        self.__waitResponse('', 0.05)
+        while(len(self.buffer) > 0):
+            buff = self.buffer[0]
+            topic_len = int(buff[1][:4], 16)
+            topic_end_idx = 4 + (topic_len * 2)
+            topic = self.__hexStrToStr(buff[1][4:topic_end_idx])
+            # Qos
+            if(buff[0] == 1):
+                identifier = int(buff[1][topic_end_idx:topic_end_idx + 4], 16)
+                topic_end_idx += 4
+            msg = self.__hexStrToStr(buff[1][topic_end_idx:])
+            self.callback(topic, msg)
+            self.buffer = self.buffer[1:]
 
     def setKeepAliveInterval(self, keepAliveInterval):
         self.keepAlive_s = keepAliveInterval
@@ -351,7 +360,7 @@ class MQTT(SIM7000E_TPC):
     def __strToHexString(self, string):
         return (''.join([hex(ord(x))[2:] for x in string])).upper()
 
-    def __hexStrToStr(hexStr):
+    def __hexStrToStr(self, hexStr):
         hex_byte_s = re.findall(r'.{2}', hexStr)
         return (''.join(chr(int(hex_byte, 16)) for hex_byte in hex_byte_s))
 
@@ -386,6 +395,10 @@ class MQTT(SIM7000E_TPC):
         return False
 
 
+def callback(topic, msg):
+    logger.info('Topic: {}, Msg: {}'.format(topic, msg))
+
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
@@ -397,7 +410,7 @@ if __name__ == '__main__':
     broker = '35.162.236.171'
     port = 8883
     mqtt_id = 'B827EBDD70BA'
-    keepAlive = 300
+    keepAlive = 60
     username = 'maps'
     password = 'iisnrl'
     clear_session = True
@@ -408,16 +421,19 @@ if __name__ == '__main__':
 
     mqtt = MQTT(tcp, broker, port, username,
                 password, keepAlive, mqtt_id, clear_session)
+    mqtt.setCallback(callback)
     if(mqtt.connect()):
         print('MQTT Connect success')
         print('Subscribe qos: {}'.format(mqtt.subscribe(topic, qos)))
         print('Publish result: {}'.format(
             mqtt.publish(topic, msg, qos)))
-        print('unSubscribe result: {}'.format(mqtt.unSubscribe(topic)))
+        # print('unSubscribe result: {}'.format(mqtt.unSubscribe(topic)))
         print('PingReq result: {}'.format(mqtt.pingReq()))
+
+        while(True):
+            mqtt.loop()
         print('wait 5 Second...')
         time.sleep(5)
         print('Disconnect result: {}'.format(mqtt.disconnect()))
-
     else:
         print('MQTT Connect fail')
