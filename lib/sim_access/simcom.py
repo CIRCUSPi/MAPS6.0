@@ -47,7 +47,6 @@ class SIMModuleBase(object):
 
     def wait_key(self, key, timeout=1000):
         done = False
-        counter = 0
         msgs = []
         timeout = time.time() + (timeout / 1000)
         while done == False and time.time() < timeout:

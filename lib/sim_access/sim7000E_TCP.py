@@ -102,7 +102,7 @@ class SIM7000E_TPC(SIMModuleBase):
                 self.adapter.write(tmp.encode())
                 self.wait_key('> ')
                 self.adapter.write(data.encode())
-                self.wait_key('SEND OK\r\n', 10000)
+                self.wait_key('SEND OK\r\n', 30000)
                 break
             except Exception as e:
                 error = str(e)
@@ -185,15 +185,18 @@ class SIM7000E_TPC(SIMModuleBase):
             try:
                 tmp = ATCommands.tcp_status()
                 self.adapter.write(tmp.encode())
-                msgs = self.wait_key('STATE: ')
-                for msg in msgs:
-                    re_result = re.search('STATE: ([A-Z]+)', msg)
-                    if(re_result):
-                        assert len(re_result.groups()) == 1
-                        status = re_result.group(1)
-                        logger.debug('tcp status: {}'.format(status))
-                        logger.info('TCP Status: {}'.format(status))
-                        return (status == 'CONNECT OK')
+                self.wait_ok()
+                tmp = '\r\n'
+                while tmp == '\r\n':
+                    tmp = self.adapter.readline()
+                    tmp = tmp.decode()
+                re_result = re.search('STATE: ([A-Z ]+)', tmp)
+                if(re_result):
+                    assert len(re_result.groups()) == 1
+                    status = re_result.group(1)
+                    logger.debug('tcp status: {}'.format(status))
+                    logger.info('TCP Status: {}'.format(status))
+                    return (status == 'CONNECT OK')
                 assert Exception('The response exceeded expectations')
             except Exception as e:
                 error = str(e)
@@ -208,7 +211,7 @@ class SIM7000E_TPC(SIMModuleBase):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO,
+    logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -218,25 +221,26 @@ if __name__ == '__main__':
         mqtt_conn_pkg = '103A00044D51545404C2003C0020343937323132303436343637346563383861316166346137316436356237356600046D61707300066969736E726C'
         mqtt_publish_pkg_qos1 = '321C00174D4150532F4D415053362F423832374542354545344131000331'
         mqtt_publish_pkg_qos0 = '301A00174D4150532F4D415053362F42383237454235454534413138'
-        tcp.connect('35.162.236.171', 8883)
-        tcp.sendData(mqtt_conn_pkg)
-        available_data_len = 0
-        while(available_data_len == 0):
-            available_data_len = tcp.available()
-        print('mqtt connect receive data {} byte'.format(available_data_len))
-        data = tcp.readData(4)
-        print('mqtt connect receive data: {}'.format(data))
+        if(not tcp.connected()):
+            tcp.connect('35.162.236.171', 8883)
+            tcp.sendData(mqtt_conn_pkg)
+            available_data_len = 0
+            while(available_data_len == 0):
+                available_data_len = tcp.available()
+            print('mqtt connect receive data {} byte'.format(available_data_len))
+            data = tcp.readData(4)
+            print('mqtt connect receive data: {}'.format(data))
 
-        tcp.sendData(mqtt_publish_pkg_qos1)
-        available_data_len = 0
-        while(available_data_len == 0):
-            available_data_len = tcp.available()
-        print('mqtt publish receive data {} byte'.format(available_data_len))
-        data = tcp.readData(4)
-        print('mqtt publish receive data: {}'.format(data))
+            tcp.sendData(mqtt_publish_pkg_qos1)
+            available_data_len = 0
+            while(available_data_len == 0):
+                available_data_len = tcp.available()
+            print('mqtt publish receive data {} byte'.format(available_data_len))
+            data = tcp.readData(4)
+            print('mqtt publish receive data: {}'.format(data))
 
-        tcp.sendData(mqtt_publish_pkg_qos0)
-        tcp.disconnect()
+            tcp.sendData(mqtt_publish_pkg_qos0)
+            tcp.disconnect()
     except Exception as e:
         error = str(e)
         print(error)
