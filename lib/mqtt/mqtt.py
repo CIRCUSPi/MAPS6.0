@@ -122,45 +122,41 @@ class MQTT(SIM7000E_TPC):
                 self.tcp.sendData(packet)
                 # Wait Response
                 # 3.2 CONNACK – Acknowledge connection request
-                if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_CONNACK)):
+                if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_CONNACK + '02')):
                     # 3.2.1 Fixed header
                     # 3.2.2 Variable header
-                    receive_packet = self.tcp.readData(3)
-                    if(int(len(receive_packet) / 2) == 3):
-                        if(receive_packet[:2] == '02'):
-                            byte1 = receive_packet[2:4]
-                            byte2 = receive_packet[4:6]
-                            if(byte1 == '01'):
-                                logger.info(
-                                    'Server has stored 684 Session state')
-                            if(byte2 == '00'):
-                                logger.info('MQTT Connection Accepted.')
-                                return True
-                            elif(byte2 == '01'):
-                                logger.info(
-                                    'MQTT Connection Refused, unacceptable protocol version')
-                            elif(byte2 == '02'):
-                                logger.info(
-                                    'MQTT Connection Refused, identifier rejected')
-                            elif(byte2 == '03'):
-                                logger.info(
-                                    'MQTT Connection Refused, Server unavailable')
-                            elif(byte2 == '04'):
-                                logger.info(
-                                    'MQTT Connection Refused, bad user name or password')
-                            elif(byte2 == '05'):
-                                logger.info(
-                                    'MQTT Connection Refused, not authorized')
-                            return False
-                        else:
-                            raise Exception(
-                                'receive_packet >> The beginning does not match 2002')
+                    receive_packet = self.tcp.readData(2)
+                    if(int(len(receive_packet) / 2) == 2):
+                        byte1 = receive_packet[:2]
+                        byte2 = receive_packet[2:4]
+                        if(byte1 == '01'):
+                            logger.info(
+                                'Server has stored 684 Session state')
+                        if(byte2 == '00'):
+                            logger.info('MQTT Connection Accepted.')
+                            return True
+                        elif(byte2 == '01'):
+                            logger.info(
+                                'MQTT Connection Refused, unacceptable protocol version')
+                        elif(byte2 == '02'):
+                            logger.info(
+                                'MQTT Connection Refused, identifier rejected')
+                        elif(byte2 == '03'):
+                            logger.info(
+                                'MQTT Connection Refused, Server unavailable')
+                        elif(byte2 == '04'):
+                            logger.info(
+                                'MQTT Connection Refused, bad user name or password')
+                        elif(byte2 == '05'):
+                            logger.info(
+                                'MQTT Connection Refused, not authorized')
+                        return False
                     else:
                         raise Exception(
-                            'receive_packet >> The length is not 3 bytes')
+                            'receive_packet >> The length is not 2 bytes')
                 else:
-                    logger.info('Not received CONNACK packet')
-                    return False
+                    raise Exception(
+                        'receive_packet >> The beginning does not match 2002')
         except Exception as e:
             error = str(e)
             logger.error(error)
@@ -218,15 +214,14 @@ class MQTT(SIM7000E_TPC):
                     return True
                 # Wait Response
                 # 3.4 PUBACK – Publish acknowledgement
-                if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_PUBACK)):
+                if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_PUBACK + '02')):
                     # 3.4.1 Fixed header
-                    receive_packet = self.tcp.readData(3)
-                    if(int(len(receive_packet) / 2) == 3):
-                        if(receive_packet[:2] == '02'):
-                            # 3.4.2 Variable header
-                            receive_identifier = receive_packet[2:]
-                            if(receive_identifier == send_identifier):
-                                return True
+                    receive_packet = self.tcp.readData(2)
+                    if(int(len(receive_packet) / 2) == 2):
+                        # 3.4.2 Variable header
+                        receive_identifier = receive_packet
+                        if(receive_identifier == send_identifier):
+                            return True
             else:
                 logger.info('MQTT not connected.')
             return False
@@ -259,19 +254,18 @@ class MQTT(SIM7000E_TPC):
                 self.tcp.sendData(packet)
                 # Wait Response
                 # 3.9 SUBACK – Subscribe acknowledgement
-                if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_SUBACK)):
+                if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_SUBACK + '03')):
                     # 3.9.1 Fixed header
-                    receive_packet = self.tcp.readData(4)
-                    if(int(len(receive_packet) / 2) == 4):
-                        if(receive_packet[:2] == '03'):
-                            # 3.9.2 Variable header
-                            receive_identifier = receive_packet[2:6]
-                            if(receive_identifier == send_identifier):
-                                receive_qos = receive_packet[6:8]
-                                if(receive_qos == '80'):
-                                    return None
-                                elif(receive_qos == '00' or receive_qos == '01'):
-                                    return int(receive_qos)
+                    receive_packet = self.tcp.readData(3)
+                    if(int(len(receive_packet) / 2) == 3):
+                        # 3.9.2 Variable header
+                        receive_identifier = receive_packet[:4]
+                        if(receive_identifier == send_identifier):
+                            receive_qos = receive_packet[4:6]
+                            if(receive_qos == '80'):
+                                return None
+                            elif(receive_qos == '00' or receive_qos == '01'):
+                                return int(receive_qos)
             else:
                 logger.info('MQTT not connected.')
             return None
@@ -301,15 +295,14 @@ class MQTT(SIM7000E_TPC):
                 self.tcp.sendData(packet)
                 # Wait Response
                 # 3.11 UNSUBACK – Unsubscribe acknowledgement
-                if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_UNSUBACK)):
+                if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_UNSUBACK + '02')):
                     # 3.11.1 Fixed header
-                    receive_packet = self.tcp.readData(3)
-                    if(int(len(receive_packet) / 2) == 3):
-                        if(receive_packet[:2] == '02'):
-                            # 3.11.2 Variable header
-                            receive_identifier = receive_packet[2:6]
-                            if(receive_identifier == send_identifier):
-                                return True
+                    receive_packet = self.tcp.readData(2)
+                    if(int(len(receive_packet) / 2) == 2):
+                        # 3.11.2 Variable header
+                        receive_identifier = receive_packet
+                        if(receive_identifier == send_identifier):
+                            return True
             else:
                 logger.info('MQTT not connected.')
             return False
@@ -328,11 +321,7 @@ class MQTT(SIM7000E_TPC):
                 self.tcp.sendData(packet)
                 # Wait Response
                 # 3.13 PINGRESP – PING response
-                if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_PINGRESP)):
-                    # 3.13.1 Fixed header
-                    receive_packet = self.tcp.readData(1)
-                    if(int(len(receive_packet) / 2) == 1):
-                        return (receive_packet == '00')
+                return (self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_PINGRESP + '00'))
             else:
                 logger.info('MQTT not connected.')
             return False
@@ -379,16 +368,17 @@ class MQTT(SIM7000E_TPC):
         # FIXME: There may be bugs here...
         m_timeout = time.time() + (timeout / 1000)
         while(time.time() < m_timeout):
-            if(self.tcp.available() > 0):
-                receive_packet = self.tcp.readData(1)
+            if(self.tcp.available() >= 2):
+                receive_packet = self.tcp.readData(2)
                 if(receive_packet == packet_header):
                     return True
-                elif(receive_packet == '30' or receive_packet == '32'):
-                    # TODO: Save Qos
+                elif(receive_packet[:2] == '30' or receive_packet[:2] == '32'):
+                    qos = (int(receive_packet[1:2], 16) >> 1)
                     # Save data publish from the broker
                     if(self.tcp.available()):
-                        remaining_len = int(self.tcp.readData(1), 16)
-                        self.buffer.append(self.tcp.readData(remaining_len))
+                        remaining_len = int(receive_packet[2:4], 16)
+                        self.buffer.append(
+                            [qos, self.tcp.readData(remaining_len)])
                         m_timeout = time.time() + (timeout / 1000)
                 else:
                     logger.error(
