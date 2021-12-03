@@ -6,12 +6,15 @@
 # @Link   :
 # @Date   : 11/26/2021, 5:45:18 PM
 
+import re
 import sys
 sys.path.append('lib\\sim_access')
 
 import logging
+import time
 from random import randint
 import hashlib
+import re
 from adapter import SerialAdapter
 from sim7000E_TCP import SIM7000E_TPC
 
@@ -23,7 +26,7 @@ logger = logging.getLogger(__name__)
 MQTT_CONTROL_TYPE_PACKET_CONNECT = '10'  # Client request to connect to Server
 MQTT_CONTROL_TYPE_PACKET_CONNACK = '20'  # Connect acknowledgment
 # FIXME: AND Table 2.2 - flag bits
-MQTT_CONTROL_TYPE_PACKET_PUBLISH = '30'  # Publish message
+MQTT_CONTROL_TYPE_PACKET_PUBLISH = '3'  # Publish message
 MQTT_CONTROL_TYPE_PACKET_PUBACK = '40'   # Publish acknowledgment
 # Publish re_TYPEceived (assured delivery part 1)
 MQTT_CONTROL_TYPE_PACKET_PUBREC = '50'
@@ -45,10 +48,11 @@ MQTT_PROTOCOL_LEVEL = '4'  # MQTT Version 3.1.1
 
 class MQTT(SIM7000E_TPC):
     ''' Note: Remaining Length currently support range 0~16383(1~2 byte)
+        Note: QoS currently support range 0~1
     '''
 
     def __init__(self, tcpSocket, broker, port=1883, username='', password='', keepAlive_s=300, mqtt_id='', clean_session=True):
-        assert isinstance(tcp, SIM7000E_TPC)
+        assert isinstance(tcpSocket, SIM7000E_TPC)
         assert isinstance(broker, str)
         assert isinstance(port, int)
         assert isinstance(username, str)
@@ -63,9 +67,14 @@ class MQTT(SIM7000E_TPC):
         self.keepAlive_s = keepAlive_s
         self.mqtt_id = mqtt_id
         self.clean_session = clean_session
+        self.publish_qos1_count = 0
+        self.callback = None
+        self.buffer = []
+        self.pingReq_timer = time.time() + self.keepAlive_s
 
     def connect(self):
-
+        ''' 3.1 CONNECT – Client requests a connection to a Server
+        '''
         try:
             if(not self.tcp.connected()):
                 self.tcp.connect(self.broker, self.port)
@@ -107,46 +116,288 @@ class MQTT(SIM7000E_TPC):
                     packet += self.__strToHexString(self.password)
                 # Replace the remaining length field
                 remaining_len = int(len(packet[4:]) / 2)
-                remaining = ''
-                if(remaining_len > 0x7F):
-                    byte1 = (int(remaining_len % 0x80) + 0x80)
-                    byte2 = int(remaining_len / 0x80)
-                    remaining = (hex(byte1)[2:].upper()) + \
-                        (hex(byte2)[2:].upper().zfill(2))
-                else:
-                    remaining = hex(remaining_len)[2:].upper().zfill(2)
-                packet = packet.replace('XX', remaining)
+                packet = packet.replace(
+                    'XX', self.__calcRemainingLen(remaining_len))
                 logger.debug(packet)
+                self.tcp.sendData(packet)
+                # Wait Response
+                # 3.2 CONNACK – Acknowledge connection request
+                if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_CONNACK)):
+                    # 3.2.1 Fixed header
+                    # 3.2.2 Variable header
+                    receive_packet = self.tcp.readData(3)
+                    if(int(len(receive_packet) / 2) == 3):
+                        if(receive_packet[:2] == '02'):
+                            byte1 = receive_packet[2:4]
+                            byte2 = receive_packet[4:6]
+                            if(byte1 == '01'):
+                                logger.info(
+                                    'Server has stored 684 Session state')
+                            if(byte2 == '00'):
+                                logger.info('MQTT Connection Accepted.')
+                                return True
+                            elif(byte2 == '01'):
+                                logger.info(
+                                    'MQTT Connection Refused, unacceptable protocol version')
+                            elif(byte2 == '02'):
+                                logger.info(
+                                    'MQTT Connection Refused, identifier rejected')
+                            elif(byte2 == '03'):
+                                logger.info(
+                                    'MQTT Connection Refused, Server unavailable')
+                            elif(byte2 == '04'):
+                                logger.info(
+                                    'MQTT Connection Refused, bad user name or password')
+                            elif(byte2 == '05'):
+                                logger.info(
+                                    'MQTT Connection Refused, not authorized')
+                            return False
+                        else:
+                            raise Exception(
+                                'receive_packet >> The beginning does not match 2002')
+                    else:
+                        raise Exception(
+                            'receive_packet >> The length is not 3 bytes')
+                else:
+                    logger.info('Not received CONNACK packet')
+                    return False
         except Exception as e:
             error = str(e)
+            logger.error(error)
 
     def disconnect(self):
-        pass
+        ''' 3.14 DISCONNECT – Disconnect notification
+        '''
+        # 3.14.1 Fixed header
+        try:
+            packet = MQTT_CONTROL_TYPE_PACKET_DISCONNECT + '00'
+            logger.debug(packet)
+            self.tcp.sendData(packet)
+            time.sleep(0.5)
+            self.tcp.disconnect()
+            logger.info('MQTT Disconnected.')
+            return True
+        except Exception as e:
+            error = str(e)
+            logger.error(error)
 
-    def publish(self, topic, msg, qos=0):
-        pass
+    def publish(self, topic, msg, qos=0, retain=False):
+        assert isinstance(topic, str)
+        assert isinstance(msg, str)
+        assert isinstance(qos, int)
+        assert isinstance(retain, bool)
+        assert (qos >= 0 and qos <= 1)
+        try:
+            if(self.tcp.connected()):
+                # TODO: 3.3.1.1 DUP
+                # 3.3.1.2 QoS
+                flag_bits = 0x00 | (qos << 1)
+                flag_bits |= retain
+                packet = MQTT_CONTROL_TYPE_PACKET_PUBLISH + \
+                    hex(flag_bits)[2:].upper() + 'XX'
+                # 3.3.2.1 Topic Name
+                packet += (hex(len(topic))[2:].upper().zfill(4))
+                packet += self.__strToHexString(topic)
+                # 3.3.2.2 Packet Identifier
+                send_identifier = ''
+                if(qos == 1):
+                    self.publish_qos1_count += 1
+                    self.publish_qos1_count %= 0xFFFF
+                    send_identifier = (hex(self.publish_qos1_count)[
+                        2:].upper().zfill(4))
+                    packet += send_identifier
+                # 3.3.3 Payload
+                packet += self.__strToHexString(msg)
+                # Replace the remaining length field
+                remaining_len = int(len(packet[4:]) / 2)
+                packet = packet.replace(
+                    'XX', self.__calcRemainingLen(remaining_len))
+                logger.debug(packet)
+                self.tcp.sendData(packet)
+                if(qos == 0):
+                    return True
+                # Wait Response
+                # 3.4 PUBACK – Publish acknowledgement
+                if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_PUBACK)):
+                    # 3.4.1 Fixed header
+                    receive_packet = self.tcp.readData(3)
+                    if(int(len(receive_packet) / 2) == 3):
+                        if(receive_packet[:2] == '02'):
+                            # 3.4.2 Variable header
+                            receive_identifier = receive_packet[2:]
+                            if(receive_identifier == send_identifier):
+                                return True
+            else:
+                logger.info('MQTT not connected.')
+            return False
+        except Exception as e:
+            error = str(e)
+            logger.error(error)
 
     def subscribe(self, topic, qos=0):
-        pass
+        ''' 3.8 SUBSCRIBE - Subscribe to topics
+        '''
+        assert isinstance(topic, str)
+        assert isinstance(qos, int)
+        assert (qos >= 0 and qos <= 1)
+        try:
+            if(self.tcp.connected()):
+                # 3.8.1 Fixed header
+                packet = MQTT_CONTROL_TYPE_PACKET_SUBSCRIBE + 'XX'
+                # 3.8.2 Variable header
+                send_identifier = (hex(randint(0, 65535))[2:].upper().zfill(4))
+                packet += send_identifier
+                # 3.8.3 Payload
+                packet += (hex(len(topic))[2:].upper().zfill(4))
+                packet += self.__strToHexString(topic)
+                packet += str(qos).zfill(2)
+                # Replace the remaining length field
+                remaining_len = int(len(packet[4:]) / 2)
+                packet = packet.replace(
+                    'XX', self.__calcRemainingLen(remaining_len))
+                logger.debug(packet)
+                self.tcp.sendData(packet)
+                # Wait Response
+                # 3.9 SUBACK – Subscribe acknowledgement
+                if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_SUBACK)):
+                    # 3.9.1 Fixed header
+                    receive_packet = self.tcp.readData(4)
+                    if(int(len(receive_packet) / 2) == 4):
+                        if(receive_packet[:2] == '03'):
+                            # 3.9.2 Variable header
+                            receive_identifier = receive_packet[2:6]
+                            if(receive_identifier == send_identifier):
+                                receive_qos = receive_packet[6:8]
+                                if(receive_qos == '80'):
+                                    return None
+                                elif(receive_qos == '00' or receive_qos == '01'):
+                                    return int(receive_qos)
+            else:
+                logger.info('MQTT not connected.')
+            return None
+        except Exception as e:
+            error = str(e)
+            logger.error(error)
 
     def unSubscribe(self, topic):
-        pass
+        ''' 3.10 UNSUBSCRIBE – Unsubscribe from topics
+        '''
+        assert isinstance(topic, str)
+        try:
+            if(self.tcp.connected()):
+                # 3.10.1 Fixed header
+                packet = MQTT_CONTROL_TYPE_PACKET_UNSUBSCRIBE + 'XX'
+                # 3.10.2 Variable header
+                send_identifier = (hex(randint(0, 65535))[2:].upper().zfill(4))
+                packet += send_identifier
+                # 3.10.3 Payload
+                packet += (hex(len(topic))[2:].upper().zfill(4))
+                packet += self.__strToHexString(topic)
+                # Replace the remaining length field
+                remaining_len = int(len(packet[4:]) / 2)
+                packet = packet.replace(
+                    'XX', self.__calcRemainingLen(remaining_len))
+                logger.debug(packet)
+                self.tcp.sendData(packet)
+                # Wait Response
+                # 3.11 UNSUBACK – Unsubscribe acknowledgement
+                if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_UNSUBACK)):
+                    # 3.11.1 Fixed header
+                    receive_packet = self.tcp.readData(3)
+                    if(int(len(receive_packet) / 2) == 3):
+                        if(receive_packet[:2] == '02'):
+                            # 3.11.2 Variable header
+                            receive_identifier = receive_packet[2:6]
+                            if(receive_identifier == send_identifier):
+                                return True
+            else:
+                logger.info('MQTT not connected.')
+            return False
+        except Exception as e:
+            error = str(e)
+            logger.error(error)
 
-    def setCallback(self, function):
-        pass
+    def pingReq(self):
+        ''' 3.12 PINGREQ – PING request
+        '''
+        try:
+            if(self.tcp.connected()):
+                # 3.12.1 Fixed header
+                packet = MQTT_CONTROL_TYPE_PACKET_PINGREQ + '00'
+                logger.debug(packet)
+                self.tcp.sendData(packet)
+                # Wait Response
+                # 3.13 PINGRESP – PING response
+                if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_PINGRESP)):
+                    # 3.13.1 Fixed header
+                    receive_packet = self.tcp.readData(1)
+                    if(int(len(receive_packet) / 2) == 1):
+                        return (receive_packet == '00')
+            else:
+                logger.info('MQTT not connected.')
+            return False
+        except Exception as e:
+            error = str(e)
+            logger.error(error)
+
+    def setCallback(self, callback):
+        self.callback = callback
 
     def loop(self):
-        pass
+        if(time.time() > self.pingReq_timer):
+            self.pingReq_timer = time.time() + self.keepAlive_s
+            if(not self.pingReq()):
+                logger.info('Not receive ping response, TCP Disconnecting...')
+                self.tcp.disconnect()
+        # Handle temp buffer
+        for buff in self.buffer:
+            topic_len = int(buff[:4], 16)
+            topic = self.__hexStrToStr(buff[4:4 + (topic_len * 2)])
+            # TODO: Check qos, read identifier, read msg
+            # TODO: Call callback
 
     def setKeepAliveInterval(self, keepAliveInterval):
-        self.keep_Alive_Interval = keepAliveInterval
+        self.keepAlive_s = keepAliveInterval
 
-    def __strToHexString(string):
+    def __strToHexString(self, string):
         return (''.join([hex(ord(x))[2:] for x in string])).upper()
+
+    def __hexStrToStr(hexStr):
+        hex_byte_s = re.findall(r'.{2}', hexStr)
+        return (''.join(chr(int(hex_byte, 16)) for hex_byte in hex_byte_s))
+
+    def __calcRemainingLen(self, remaining_len):
+        if(remaining_len > 0x7F):
+            byte1 = (int(remaining_len % 0x80) + 0x80)
+            byte2 = int(remaining_len / 0x80)
+            return (hex(byte1)[2:].upper()) + \
+                (hex(byte2)[2:].upper().zfill(2))
+        else:
+            return hex(remaining_len)[2:].upper().zfill(2)
+
+    def __waitResponse(self, packet_header, timeout=30000):
+        # FIXME: There may be bugs here...
+        m_timeout = time.time() + (timeout / 1000)
+        while(time.time() < m_timeout):
+            if(self.tcp.available() > 0):
+                receive_packet = self.tcp.readData(1)
+                if(receive_packet == packet_header):
+                    return True
+                elif(receive_packet == '30' or receive_packet == '32'):
+                    # TODO: Save Qos
+                    # Save data publish from the broker
+                    if(self.tcp.available()):
+                        remaining_len = int(self.tcp.readData(1), 16)
+                        self.buffer.append(self.tcp.readData(remaining_len))
+                        m_timeout = time.time() + (timeout / 1000)
+                else:
+                    logger.error(
+                        'Unprocessable packet: {}'.format(receive_packet))
+        return False
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG,
+    logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -156,11 +407,27 @@ if __name__ == '__main__':
     broker = '35.162.236.171'
     port = 8883
     mqtt_id = 'B827EBDD70BA'
-    keepAlive = 60
+    keepAlive = 300
     username = 'maps'
     password = 'iisnrl'
     clear_session = True
 
-    mqtt = MQTT(SIM7000E_TPC, broker, port, username,
+    topic = 'MAPS/MAPS6/B827EB5EE4A1'
+    msg = 'Hello word !'
+    qos = 1
+
+    mqtt = MQTT(tcp, broker, port, username,
                 password, keepAlive, mqtt_id, clear_session)
-    mqtt.connect()
+    if(mqtt.connect()):
+        print('MQTT Connect success')
+        print('Subscribe qos: {}'.format(mqtt.subscribe(topic, qos)))
+        print('Publish result: {}'.format(
+            mqtt.publish(topic, msg, qos)))
+        print('unSubscribe result: {}'.format(mqtt.unSubscribe(topic)))
+        print('PingReq result: {}'.format(mqtt.pingReq()))
+        print('wait 5 Second...')
+        time.sleep(5)
+        print('Disconnect result: {}'.format(mqtt.disconnect()))
+
+    else:
+        print('MQTT Connect fail')
