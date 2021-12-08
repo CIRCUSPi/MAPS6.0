@@ -32,7 +32,9 @@ class SIM7000E_TPC(SIMModuleBase):
                     logger.info('module No reply, reset module ...')
                     raise Exception('reset module')
                 elif(error == 'module not ready'):
-                    logger.info('module not ready, please wait ...')
+                    logger.info('module not ready, please check sim card...')
+                    logger.info('Hardware reset Module.')
+                    raise Exception('reset module')
                 else:
                     logger.error('Unknown exception: {}'.format(error))
                     raise Exception('Unknown exception: {}'.format(error))

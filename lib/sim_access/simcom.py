@@ -10,7 +10,7 @@ import sys
 sys.path.append('lib\\sim_access')
 
 from ATCommands import ATCommands
-from adapter import AdapterBase, SerialAdapter
+from adapter import AdapterBase, SerialAdapter, MAPS6Adapter
 import re
 import time
 import logging
@@ -40,7 +40,8 @@ class SIMModuleBase(object):
         self.adapter.write(tmp.encode())
         self.wait_ok()
         while(not self.network_chkAttach()):
-            logger.info('Wait Connect to BS ...')
+            logger.info('Wait Connect to BS...')
+            time.sleep(1)
 
     def wait_ok(self):
         return self.wait_key('OK\r\n')
@@ -126,9 +127,12 @@ class SIMModuleBase(object):
         self.adapter.write(tmp.encode())
         tmp = '\r\n'
         while tmp == '\r\n':
-            tmp = self.adapter.readline()
+            tmp = self.adapter.readline(timeout=500)
             tmp = tmp.decode()
-        return re.search('\d+.\d+.\d+.\d+', tmp).group()
+        re_result = re.search('\d+.\d+.\d+.\d+', tmp)
+        if(re_result):
+            return re_result.group()
+        return ''
 
     def network_chkAttach(self):
         ''' check attach status
@@ -161,10 +165,10 @@ class SIMModuleBase(object):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG,
+    logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
-    adapter = SerialAdapter('COM3')
+    adapter = MAPS6Adapter('COM8')
 
     try:
         sim = SIMModuleBase(adapter)

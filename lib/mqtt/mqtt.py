@@ -410,7 +410,7 @@ if __name__ == '__main__':
     broker = '35.162.236.171'
     port = 8883
     mqtt_id = 'B827EBDD70BA'
-    keepAlive = 60
+    keepAlive = 270
     username = 'maps'
     password = 'iisnrl'
     clear_session = True
@@ -429,8 +429,13 @@ if __name__ == '__main__':
             mqtt.publish(topic, msg, qos)))
         # print('unSubscribe result: {}'.format(mqtt.unSubscribe(topic)))
         print('PingReq result: {}'.format(mqtt.pingReq()))
-
+        test_timer = time.time()
         while(True):
+            if(time.time() > test_timer):
+                cur_time = time.time()
+                test_timer = cur_time + 300
+                print('Publish {}, result: {}'.format(
+                    str(cur_time), mqtt.publish(topic, str(cur_time), qos)))
             mqtt.loop()
         print('wait 5 Second...')
         time.sleep(5)
