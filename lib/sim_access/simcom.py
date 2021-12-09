@@ -46,7 +46,7 @@ class SIMModuleBase(object):
     def wait_ok(self):
         return self.wait_key('OK\r\n')
 
-    def wait_key(self, key, timeout=1000):
+    def wait_key(self, key, timeout=2000):
         done = False
         msgs = []
         timeout = time.time() + (timeout / 1000)

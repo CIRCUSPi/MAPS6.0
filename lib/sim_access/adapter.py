@@ -98,7 +98,7 @@ class ByteFIFO(object):
         end_idx = self.__buf.find(0x0A)
         if(end_idx != -1):
             return bytes(self.get(end_idx + 1))
-        return bytes()
+        return bytes(self.get(self._len()))
 
     def _len(self):
         return len(self.__buf)
@@ -248,10 +248,14 @@ class MAPS6Adapter(AdapterBase):
     def write(self, data):
         assert isinstance(data, bytes)
         logger.debug('>' + data.decode())
-        self.__port.write(self.__Make_PROTOCOL_UART_TX_CMD(
-            MAPS_NBIOT_UART_PORT, data))
-        if(self.__wait_response(MAPS_UART_TX_RX_CMD)):
-            return True
+        try_count = 0
+        while(try_count < 10):
+            self.__port.write(self.__Make_PROTOCOL_UART_TX_CMD(
+                MAPS_NBIOT_UART_PORT, data))
+            if(self.__wait_response(MAPS_UART_TX_RX_CMD)):
+                break
+            logger.info('write error, try again...')
+            try_count += 1
 
     def available(self):
         pass

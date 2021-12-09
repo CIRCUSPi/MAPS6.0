@@ -15,7 +15,7 @@ import time
 from random import randint
 import hashlib
 import re
-from adapter import SerialAdapter
+from adapter import SerialAdapter, MAPS6Adapter
 from sim7000E_TCP import SIM7000E_TPC
 
 
@@ -340,7 +340,7 @@ class MQTT(SIM7000E_TPC):
                 logger.info('Not receive ping response, TCP Disconnecting...')
                 self.tcp.disconnect()
         # Handle temp buffer
-        self.__waitResponse('', 0.05)
+        self.__waitResponse('', 50)
         while(len(self.buffer) > 0):
             buff = self.buffer[0]
             topic_len = int(buff[1][:4], 16)
@@ -395,8 +395,14 @@ class MQTT(SIM7000E_TPC):
         return False
 
 
+receive_count = 0
+
+
 def callback(topic, msg):
+    global receive_count
     logger.info('Topic: {}, Msg: {}'.format(topic, msg))
+    receive_count += 1
+    print(f'receive_count: {receive_count}')
 
 
 if __name__ == '__main__':
@@ -404,7 +410,7 @@ if __name__ == '__main__':
                         format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
 
-    adapter = SerialAdapter('COM3')
+    adapter = MAPS6Adapter('COM8')
     tcp = SIM7000E_TPC(adapter)
 
     broker = '35.162.236.171'
@@ -422,6 +428,7 @@ if __name__ == '__main__':
     mqtt = MQTT(tcp, broker, port, username,
                 password, keepAlive, mqtt_id, clear_session)
     mqtt.setCallback(callback)
+    tcp.disconnect()
     if(mqtt.connect()):
         print('MQTT Connect success')
         print('Subscribe qos: {}'.format(mqtt.subscribe(topic, qos)))
@@ -430,12 +437,20 @@ if __name__ == '__main__':
         # print('unSubscribe result: {}'.format(mqtt.unSubscribe(topic)))
         print('PingReq result: {}'.format(mqtt.pingReq()))
         test_timer = time.time()
+        pub_count = 0
+        pub_count_success = 0
         while(True):
             if(time.time() > test_timer):
                 cur_time = time.time()
                 test_timer = cur_time + 300
-                print('Publish {}, result: {}'.format(
-                    str(cur_time), mqtt.publish(topic, str(cur_time), qos)))
+                pub_msg = str(cur_time)
+                pub_result = mqtt.publish(topic, str(cur_time), qos)
+                pub_count += 1
+                print(f'Publish {pub_msg}, result: {pub_result}')
+                if(pub_result):
+                    pub_count_success += 1
+                print(
+                    f'pub_count: {pub_count}, success count: {pub_count_success}')
             mqtt.loop()
         print('wait 5 Second...')
         time.sleep(5)

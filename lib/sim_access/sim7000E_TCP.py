@@ -11,7 +11,7 @@ sys.path.append('lib\\sim_access')
 
 import re
 from ATCommands import ATCommands
-from adapter import AdapterBase, SerialAdapter
+from adapter import AdapterBase, SerialAdapter, MAPS6Adapter
 from simcom import SIMModuleBase
 import logging
 
@@ -58,7 +58,7 @@ class SIM7000E_TPC(SIMModuleBase):
                 self.network_setapn(apn)
                 self.network_bringup()
                 local_ip = self.network_ipaddr()
-                logger.debug('local ip: '.format(local_ip))
+                logger.debug(f'local ip: {local_ip}')
                 tmp = ATCommands.tcp_connect(ip, port)
                 self.adapter.write(tmp.encode())
                 self.wait_key('CONNECT OK\r\n', timeout=800000)
@@ -213,11 +213,11 @@ class SIM7000E_TPC(SIMModuleBase):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG,
+    logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
 
-    adapter = SerialAdapter('COM3')
+    adapter = MAPS6Adapter('COM8')
     try:
         tcp = SIM7000E_TPC(adapter)
         mqtt_conn_pkg = '103A00044D51545404C2003C0020343937323132303436343637346563383861316166346137316436356237356600046D61707300066969736E726C'
