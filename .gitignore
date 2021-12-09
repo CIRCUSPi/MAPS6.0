@@ -128,3 +128,5 @@ dmypy.json
 .pyre/
 
 .vscode/
+arduino-1.8.9/
+icshop_maps/

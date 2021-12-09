@@ -51,6 +51,10 @@ def atset(cmd, extended):
 class ATCommands(object):
 
     @classmethod
+    def test(cls):
+        return 'AT\r\n'
+
+    @classmethod
     def module_setecho(cls, enable):
         if enable == False:
             return atcmd('E', False) + '0\r\n'
@@ -126,7 +130,7 @@ class ATCommands(object):
         ''' output data can not exceed 1460 bytes at a time.
         '''
         return atset('CIPRXGET', True) + '2,{}\r\n'.format(len)
-    
+
     @classmethod
     def tcp_readHEXData(cls, len):
         ''' output data can not exceed 730 bytes at a time.

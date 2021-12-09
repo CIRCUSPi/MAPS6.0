@@ -201,7 +201,8 @@ class MAPS6Adapter(AdapterBase):
                     bytes_data = self.__port.read(2)
                     return (bytes_data[0] == 0x00 and bytes_data[1] == 0xFF)
                 elif(bytes_data[0] == MAPS_LEADING_CMD and bytes_data[1] == MAPS_ECHO_UART_ACTIVE_RX_CMD):
-                    self.__receive_maps_echo(bytes_data)
+                    if(not self.__receive_maps_echo(bytes_data)):
+                        logger.debug(f'Maps Echo: False')
         return False
 
     def __receive_maps_echo(self, bytes_header):
@@ -256,6 +257,7 @@ class MAPS6Adapter(AdapterBase):
                 break
             logger.info('write error, try again...')
             try_count += 1
+            time.sleep(1)
 
     def available(self):
         pass

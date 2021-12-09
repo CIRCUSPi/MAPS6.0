@@ -6,14 +6,12 @@
 # @Link   :
 # @Date   : 11/26/2021, 10:05:20 AM
 
-import sys
-sys.path.append('lib\\sim_access')
-
-from ATCommands import ATCommands
-from adapter import AdapterBase, SerialAdapter, MAPS6Adapter
 import re
 import time
 import logging
+
+from lib.sim_access.ATCommands import ATCommands
+from lib.sim_access.adapter import AdapterBase, SerialAdapter, MAPS6Adapter
 
 
 logger = logging.getLogger(__name__)
@@ -24,8 +22,18 @@ class SIMModuleBase(object):
     def __init__(self, adapter):
         assert isinstance(adapter, AdapterBase)
         self.adapter = adapter
+        self.check_module_exist()
         self.__initialize()
         self.data_available_flag = False
+
+    def check_module_exist(self):
+        while(True):
+            try:
+                if(self.test_module()):
+                    return True
+            except Exception as e:
+                logger.error('module no reply')
+                logger.error(str(e))
 
     def __initialize(self):
         count = 0
@@ -62,9 +70,19 @@ class SIMModuleBase(object):
                 raise Exception('Failed')
             elif line == '+CIPRXGET: 1\r\n':
                 self.data_available_flag = True
+            elif line == '':
+                time.sleep(0.2)
         if not done:
             raise Exception('No reply')
         return msgs
+
+    def test_module(self):
+        ''' test module
+        '''
+        tmp = ATCommands.test()
+        self.adapter.write(tmp.encode())
+        self.wait_ok()
+        return True
 
     def module_checkready(self):
         ''' check if module is ready

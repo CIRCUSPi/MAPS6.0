@@ -6,14 +6,12 @@
 # @Link   :
 # @Date   : 11/26/2021, 4:03:34 PM
 
-import sys
-sys.path.append('lib\\sim_access')
-
 import re
-from ATCommands import ATCommands
-from adapter import AdapterBase, SerialAdapter, MAPS6Adapter
-from simcom import SIMModuleBase
 import logging
+
+from lib.sim_access.ATCommands import ATCommands
+from lib.sim_access.adapter import AdapterBase, SerialAdapter, MAPS6Adapter
+from lib.sim_access.simcom import SIMModuleBase
 
 
 logger = logging.getLogger(__name__)
@@ -21,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class SIM7000E_TPC(SIMModuleBase):
     def __init__(self, adapter):
-        assert isinstance(adapter, AdapterBase)
+        assert isinstance(adapter, MAPS6Adapter)
         while(True):
             try:
                 super().__init__(adapter)
@@ -61,7 +59,7 @@ class SIM7000E_TPC(SIMModuleBase):
                 logger.debug(f'local ip: {local_ip}')
                 tmp = ATCommands.tcp_connect(ip, port)
                 self.adapter.write(tmp.encode())
-                self.wait_key('CONNECT OK\r\n', timeout=800000)
+                self.wait_key('CONNECT OK\r\n', timeout=120000)
                 break
             except Exception as e:
                 error = str(e)

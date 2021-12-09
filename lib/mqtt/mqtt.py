@@ -7,16 +7,14 @@
 # @Date   : 11/26/2021, 5:45:18 PM
 
 import re
-import sys
-sys.path.append('lib\\sim_access')
 
 import logging
 import time
 from random import randint
 import hashlib
 import re
-from adapter import SerialAdapter, MAPS6Adapter
-from sim7000E_TCP import SIM7000E_TPC
+from lib.sim_access.adapter import SerialAdapter, MAPS6Adapter
+from lib.sim_access.sim7000E_TCP import SIM7000E_TPC
 
 
 logger = logging.getLogger(__name__)
@@ -339,20 +337,21 @@ class MQTT(SIM7000E_TPC):
             if(not self.pingReq()):
                 logger.info('Not receive ping response, TCP Disconnecting...')
                 self.tcp.disconnect()
+                self.connect()
         # Handle temp buffer
-        self.__waitResponse('', 50)
-        while(len(self.buffer) > 0):
-            buff = self.buffer[0]
-            topic_len = int(buff[1][:4], 16)
-            topic_end_idx = 4 + (topic_len * 2)
-            topic = self.__hexStrToStr(buff[1][4:topic_end_idx])
-            # Qos
-            if(buff[0] == 1):
-                identifier = int(buff[1][topic_end_idx:topic_end_idx + 4], 16)
-                topic_end_idx += 4
-            msg = self.__hexStrToStr(buff[1][topic_end_idx:])
-            self.callback(topic, msg)
-            self.buffer = self.buffer[1:]
+        # self.__waitResponse('', 50)
+        # while(len(self.buffer) > 0):
+        #     buff = self.buffer[0]
+        #     topic_len = int(buff[1][:4], 16)
+        #     topic_end_idx = 4 + (topic_len * 2)
+        #     topic = self.__hexStrToStr(buff[1][4:topic_end_idx])
+        #     # Qos
+        #     if(buff[0] == 1):
+        #         identifier = int(buff[1][topic_end_idx:topic_end_idx + 4], 16)
+        #         topic_end_idx += 4
+        #     msg = self.__hexStrToStr(buff[1][topic_end_idx:])
+        #     self.callback(topic, msg)
+        #     self.buffer = self.buffer[1:]
 
     def setKeepAliveInterval(self, keepAliveInterval):
         self.keepAlive_s = keepAliveInterval
@@ -373,7 +372,7 @@ class MQTT(SIM7000E_TPC):
         else:
             return hex(remaining_len)[2:].upper().zfill(2)
 
-    def __waitResponse(self, packet_header, timeout=30000):
+    def __waitResponse(self, packet_header, timeout=120000):
         # FIXME: There may be bugs here...
         m_timeout = time.time() + (timeout / 1000)
         while(time.time() < m_timeout):
@@ -393,16 +392,6 @@ class MQTT(SIM7000E_TPC):
                     logger.error(
                         'Unprocessable packet: {}'.format(receive_packet))
         return False
-
-
-receive_count = 0
-
-
-def callback(topic, msg):
-    global receive_count
-    logger.info('Topic: {}, Msg: {}'.format(topic, msg))
-    receive_count += 1
-    print(f'receive_count: {receive_count}')
 
 
 if __name__ == '__main__':
@@ -427,31 +416,14 @@ if __name__ == '__main__':
 
     mqtt = MQTT(tcp, broker, port, username,
                 password, keepAlive, mqtt_id, clear_session)
-    mqtt.setCallback(callback)
     tcp.disconnect()
     if(mqtt.connect()):
         print('MQTT Connect success')
         print('Subscribe qos: {}'.format(mqtt.subscribe(topic, qos)))
         print('Publish result: {}'.format(
             mqtt.publish(topic, msg, qos)))
-        # print('unSubscribe result: {}'.format(mqtt.unSubscribe(topic)))
+        print('unSubscribe result: {}'.format(mqtt.unSubscribe(topic)))
         print('PingReq result: {}'.format(mqtt.pingReq()))
-        test_timer = time.time()
-        pub_count = 0
-        pub_count_success = 0
-        while(True):
-            if(time.time() > test_timer):
-                cur_time = time.time()
-                test_timer = cur_time + 300
-                pub_msg = str(cur_time)
-                pub_result = mqtt.publish(topic, str(cur_time), qos)
-                pub_count += 1
-                print(f'Publish {pub_msg}, result: {pub_result}')
-                if(pub_result):
-                    pub_count_success += 1
-                print(
-                    f'pub_count: {pub_count}, success count: {pub_count_success}')
-            mqtt.loop()
         print('wait 5 Second...')
         time.sleep(5)
         print('Disconnect result: {}'.format(mqtt.disconnect()))
