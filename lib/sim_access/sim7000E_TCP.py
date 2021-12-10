@@ -27,11 +27,11 @@ class SIM7000E_TPC(SIMModuleBase):
             except Exception as e:
                 error = str(e)
                 if(error == 'No reply'):
-                    logger.info('module No reply, reset module ...')
+                    logger.error('module No reply, reset module ...')
                     raise Exception('reset module')
                 elif(error == 'module not ready'):
-                    logger.info('module not ready, please check sim card...')
-                    logger.info('Hardware reset Module.')
+                    logger.error('module not ready, please check sim card...')
+                    logger.error('Hardware reset Module.')
                     raise Exception('reset module')
                 else:
                     logger.error('Unknown exception: {}'.format(error))
@@ -195,7 +195,7 @@ class SIM7000E_TPC(SIMModuleBase):
                     assert len(re_result.groups()) == 1
                     status = re_result.group(1)
                     logger.debug('tcp status: {}'.format(status))
-                    logger.info('TCP Status: {}'.format(status))
+                    logger.debug('TCP Status: {}'.format(status))
                     return (status == 'CONNECT OK')
                 assert Exception('The response exceeded expectations')
             except Exception as e:

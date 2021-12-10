@@ -36,7 +36,7 @@ if __name__ == '__main__':
 
     broker = '35.162.236.171'
     port = 8883
-    mqtt_id = 'B827EBDD70BA_1'
+    mqtt_id = 'B827EBDD70BA_2'
     keepAlive = 270
     username = 'maps'
     password = 'iisnrl'
@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
     mqtt = MQTT(tcp, broker, port, username,
                 password, keepAlive, mqtt_id, clear_session)
-    tcp.disconnect()
+    mqtt.disconnect()
     if(mqtt.connect()):
         print('MQTT Connect success')
         # print('Subscribe qos: {}'.format(mqtt.subscribe(topic, qos)))
@@ -57,6 +57,7 @@ if __name__ == '__main__':
         # print('unSubscribe result: {}'.format(mqtt.unSubscribe(topic)))
         print('PingReq result: {}'.format(mqtt.pingReq()))
         test_timer = time.time()
+        chk_conn_timer = time.time()
         pub_count = 0
         pub_count_success = 0
         while(True):
@@ -71,8 +72,13 @@ if __name__ == '__main__':
                     if(pub_result):
                         pub_count_success += 1
                     print(
-                        f'pub_count: {pub_count}, success count: {pub_count_success}')
+                        f'pub_count: {pub_count}, success count: {pub_count_success}, csq: {tcp.network_getCsq()}')
                 mqtt.loop()
+                if(time.time() > chk_conn_timer):
+                    chk_conn_timer = time.time() + 5
+                    if(not mqtt.connected()):
+                        mqtt.disconnect()
+                        mqtt.connect()
             except Exception as e:
                 print(e)
     else:

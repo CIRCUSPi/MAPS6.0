@@ -44,9 +44,10 @@ MQTT_PROTOCOL_NAME = 'MQTT'
 MQTT_PROTOCOL_LEVEL = '4'  # MQTT Version 3.1.1
 
 
-class MQTT(SIM7000E_TPC):
-    ''' Note: Remaining Length currently support range 0~16383(1~2 byte)
-        Note: QoS currently support range 0~1
+class MQTT(object):
+    ''' Note: Remaining Length currently support range 0~16383(1~2 byte).
+        Note: QoS currently support range 0~1.
+        Note: All exceptions are handled in the MQTT category.
     '''
 
     def __init__(self, tcpSocket, broker, port=1883, username='', password='', keepAlive_s=300, mqtt_id='', clean_session=True):
@@ -71,7 +72,7 @@ class MQTT(SIM7000E_TPC):
         self.pingReq_timer = time.time() + self.keepAlive_s
 
     def connect(self):
-        ''' 3.1 CONNECT – Client requests a connection to a Server
+        ''' 3.1 CONNECT - Client requests a connection to a Server
         '''
         try:
             if(not self.tcp.connected()):
@@ -119,7 +120,7 @@ class MQTT(SIM7000E_TPC):
                 logger.debug(packet)
                 self.tcp.sendData(packet)
                 # Wait Response
-                # 3.2 CONNACK – Acknowledge connection request
+                # 3.2 CONNACK - Acknowledge connection request
                 if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_CONNACK + '02')):
                     # 3.2.1 Fixed header
                     # 3.2.2 Variable header
@@ -128,25 +129,25 @@ class MQTT(SIM7000E_TPC):
                         byte1 = receive_packet[:2]
                         byte2 = receive_packet[2:4]
                         if(byte1 == '01'):
-                            logger.info(
+                            logger.warning(
                                 'Server has stored 684 Session state')
                         if(byte2 == '00'):
                             logger.info('MQTT Connection Accepted.')
                             return True
                         elif(byte2 == '01'):
-                            logger.info(
+                            logger.warning(
                                 'MQTT Connection Refused, unacceptable protocol version')
                         elif(byte2 == '02'):
-                            logger.info(
+                            logger.warning(
                                 'MQTT Connection Refused, identifier rejected')
                         elif(byte2 == '03'):
-                            logger.info(
+                            logger.warning(
                                 'MQTT Connection Refused, Server unavailable')
                         elif(byte2 == '04'):
-                            logger.info(
+                            logger.warning(
                                 'MQTT Connection Refused, bad user name or password')
                         elif(byte2 == '05'):
-                            logger.info(
+                            logger.warning(
                                 'MQTT Connection Refused, not authorized')
                         return False
                     else:
@@ -158,15 +159,20 @@ class MQTT(SIM7000E_TPC):
         except Exception as e:
             error = str(e)
             logger.error(error)
+            return False
 
     def disconnect(self):
-        ''' 3.14 DISCONNECT – Disconnect notification
+        ''' 3.14 DISCONNECT - Disconnect notification
         '''
         # 3.14.1 Fixed header
         try:
             packet = MQTT_CONTROL_TYPE_PACKET_DISCONNECT + '00'
             logger.debug(packet)
-            self.tcp.sendData(packet)
+            try:
+                if(self.tcp.connected()):
+                    self.tcp.sendData(packet)
+            except Exception as e:
+                logger.warning('MQTT Disconnect send packet error.')
             time.sleep(0.5)
             self.tcp.disconnect()
             logger.info('MQTT Disconnected.')
@@ -174,6 +180,7 @@ class MQTT(SIM7000E_TPC):
         except Exception as e:
             error = str(e)
             logger.error(error)
+            return False
 
     def publish(self, topic, msg, qos=0, retain=False):
         assert isinstance(topic, str)
@@ -211,7 +218,7 @@ class MQTT(SIM7000E_TPC):
                 if(qos == 0):
                     return True
                 # Wait Response
-                # 3.4 PUBACK – Publish acknowledgement
+                # 3.4 PUBACK - Publish acknowledgement
                 if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_PUBACK + '02')):
                     # 3.4.1 Fixed header
                     receive_packet = self.tcp.readData(2)
@@ -226,9 +233,11 @@ class MQTT(SIM7000E_TPC):
         except Exception as e:
             error = str(e)
             logger.error(error)
+            return False
 
     def subscribe(self, topic, qos=0):
         ''' 3.8 SUBSCRIBE - Subscribe to topics
+            return qos
         '''
         assert isinstance(topic, str)
         assert isinstance(qos, int)
@@ -251,7 +260,7 @@ class MQTT(SIM7000E_TPC):
                 logger.debug(packet)
                 self.tcp.sendData(packet)
                 # Wait Response
-                # 3.9 SUBACK – Subscribe acknowledgement
+                # 3.9 SUBACK - Subscribe acknowledgement
                 if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_SUBACK + '03')):
                     # 3.9.1 Fixed header
                     receive_packet = self.tcp.readData(3)
@@ -270,9 +279,10 @@ class MQTT(SIM7000E_TPC):
         except Exception as e:
             error = str(e)
             logger.error(error)
+            return None
 
     def unSubscribe(self, topic):
-        ''' 3.10 UNSUBSCRIBE – Unsubscribe from topics
+        ''' 3.10 UNSUBSCRIBE - Unsubscribe from topics
         '''
         assert isinstance(topic, str)
         try:
@@ -292,7 +302,7 @@ class MQTT(SIM7000E_TPC):
                 logger.debug(packet)
                 self.tcp.sendData(packet)
                 # Wait Response
-                # 3.11 UNSUBACK – Unsubscribe acknowledgement
+                # 3.11 UNSUBACK - Unsubscribe acknowledgement
                 if(self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_UNSUBACK + '02')):
                     # 3.11.1 Fixed header
                     receive_packet = self.tcp.readData(2)
@@ -307,9 +317,10 @@ class MQTT(SIM7000E_TPC):
         except Exception as e:
             error = str(e)
             logger.error(error)
+            return False
 
     def pingReq(self):
-        ''' 3.12 PINGREQ – PING request
+        ''' 3.12 PINGREQ - PING request
         '''
         try:
             if(self.tcp.connected()):
@@ -319,7 +330,7 @@ class MQTT(SIM7000E_TPC):
                 self.tcp.sendData(packet)
                 logger.info('pingReq')
                 # Wait Response
-                # 3.13 PINGRESP – PING response
+                # 3.13 PINGRESP - PING response
                 return (self.__waitResponse(MQTT_CONTROL_TYPE_PACKET_PINGRESP + '00'))
             else:
                 logger.info('MQTT not connected.')
@@ -327,31 +338,47 @@ class MQTT(SIM7000E_TPC):
         except Exception as e:
             error = str(e)
             logger.error(error)
+            return False
+
+    def connected(self):
+        try:
+            return self.tcp.connected()
+        except Exception as e:
+            error = str(e)
+            logger.error(error)
+            return False
 
     def setCallback(self, callback):
         self.callback = callback
 
     def loop(self):
-        if(time.time() > self.pingReq_timer):
-            self.pingReq_timer = time.time() + self.keepAlive_s
-            if(not self.pingReq()):
-                logger.info('Not receive ping response, TCP Disconnecting...')
-                self.tcp.disconnect()
-                self.connect()
-        # Handle temp buffer
-        # self.__waitResponse('', 50)
-        # while(len(self.buffer) > 0):
-        #     buff = self.buffer[0]
-        #     topic_len = int(buff[1][:4], 16)
-        #     topic_end_idx = 4 + (topic_len * 2)
-        #     topic = self.__hexStrToStr(buff[1][4:topic_end_idx])
-        #     # Qos
-        #     if(buff[0] == 1):
-        #         identifier = int(buff[1][topic_end_idx:topic_end_idx + 4], 16)
-        #         topic_end_idx += 4
-        #     msg = self.__hexStrToStr(buff[1][topic_end_idx:])
-        #     self.callback(topic, msg)
-        #     self.buffer = self.buffer[1:]
+        try:
+            if(time.time() > self.pingReq_timer):
+                self.pingReq_timer = time.time() + self.keepAlive_s
+                if(not self.pingReq()):
+                    logger.info(
+                        'Not receive ping response, TCP Disconnecting...')
+                    self.disconnect()
+            # FIXME: 暫不處理MQTT被動收到的資料
+            # Handle temp buffer
+            # self.__waitResponse('', 50)
+            # while(len(self.buffer) > 0):
+            #     buff = self.buffer[0]
+            #     topic_len = int(buff[1][:4], 16)
+            #     topic_end_idx = 4 + (topic_len * 2)
+            #     topic = self.__hexStrToStr(buff[1][4:topic_end_idx])
+            #     # Qos
+            #     if(buff[0] == 1):
+            #         identifier = int(buff[1][topic_end_idx:topic_end_idx + 4], 16)
+            #         topic_end_idx += 4
+            #     msg = self.__hexStrToStr(buff[1][topic_end_idx:])
+            #     self.callback(topic, msg)
+            #     self.buffer = self.buffer[1:]
+            return True
+        except Exception as e:
+            error = str(e)
+            logger.error(error)
+            return False
 
     def setKeepAliveInterval(self, keepAliveInterval):
         self.keepAlive_s = keepAliveInterval
@@ -385,8 +412,9 @@ class MQTT(SIM7000E_TPC):
                     # Save data publish from the broker
                     if(self.tcp.available()):
                         remaining_len = int(receive_packet[2:4], 16)
-                        self.buffer.append(
-                            [qos, self.tcp.readData(remaining_len)])
+                        # FIXME: 暫不儲存MQTT被動收到的資料
+                        # self.buffer.append(
+                        #     [qos, self.tcp.readData(remaining_len)])
                         m_timeout = time.time() + (timeout / 1000)
                 else:
                     logger.error(
@@ -395,7 +423,7 @@ class MQTT(SIM7000E_TPC):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO,
+    logging.basicConfig(level=logging.ERROR,
                         format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -416,7 +444,7 @@ if __name__ == '__main__':
 
     mqtt = MQTT(tcp, broker, port, username,
                 password, keepAlive, mqtt_id, clear_session)
-    tcp.disconnect()
+    mqtt.disconnect()
     if(mqtt.connect()):
         print('MQTT Connect success')
         print('Subscribe qos: {}'.format(mqtt.subscribe(topic, qos)))
