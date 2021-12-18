@@ -69,6 +69,8 @@ QOS = 1
 sensor_data = None
 connectionState = ConnectionState.NAN
 nbiot_csq = '-'
+gps_lat = '-'
+gps_lon = '-'
 
 nbiot_detected = False
 
@@ -84,11 +86,11 @@ def save_sd_task():
             # check is SD card is on the board
             if os.path.exists("/dev/mmcblk2p1"):
                 logger.info("SD exists")
-                #check if path is mountpoint (mounted or not)
+                # check if path is mountpoint (mounted or not)
                 if(not(os.path.ismount("/mnt/SD"))):
                     os.system(f'mount -v -t auto /dev/mmcblk2p1 {path}')
                 data_list = [DEVIDE_ID, time_pairs[0], time_pairs[1], sensor_data['TEMP'], sensor_data['HUMI'], sensor_data['PM2.5_AE'],
-                            sensor_data['PM1.0_AE'], sensor_data['PM10.0_AE'], sensor_data['Illuminance'], sensor_data['CO2'],  sensor_data['TVOC']]
+                             sensor_data['PM1.0_AE'], sensor_data['PM10.0_AE'], sensor_data['Illuminance'], sensor_data['CO2'],  sensor_data['TVOC']]
                 data = ','.join([str(d) for d in data_list])
                 with open(f'{path}/{time_pairs[0]}.csv', 'a+') as f:
                     f.write(f'{data}\n')
@@ -103,7 +105,7 @@ def NBIoT_publish_to_lass(m_mqtt):
     global sensor_data
 
     pairs = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S").split(' ')
-    msg = f"|gps_lon={0}|gps_lat={0}|s_g8={sensor_data['CO2']}|s_t0={sensor_data['TEMP']}|app={APP_ID}|date={pairs[0]}|s_d0={sensor_data['PM2.5_AE']}|s_h0={sensor_data['HUMI']}|device_id={DEVIDE_ID}|s_gg={sensor_data['TVOC']}|ver_app={MAPS_PI_VERSION}|time={pairs[1]}|MQ"
+    msg = f"|gps_lon={gps_lon}|gps_lat={gps_lat}|s_g8={sensor_data['CO2']}|s_t0={sensor_data['TEMP']}|app={APP_ID}|date={pairs[0]}|s_d0={sensor_data['PM2.5_AE']}|s_h0={sensor_data['HUMI']}|device_id={DEVIDE_ID}|s_gg={sensor_data['TVOC']}|ver_app={MAPS_PI_VERSION}|time={pairs[1]}|MQ"
     logger.info(f'publish message: {msg}')
     return m_mqtt.publish(TOPIC, msg, QOS)
 
@@ -122,7 +124,7 @@ def oled_task():
             elif(connectionState == ConnectionState.NBIOT):
                 internet_icon = 'N'
             oled.display(DEVIDE_ID, sensor_data['TEMP'], sensor_data['HUMI'], sensor_data['PM2.5_AE'], sensor_data['CO2'],
-                        sensor_data['TVOC'], internet_icon, MAPS_PI_VERSION, nbiot_csq)
+                         sensor_data['TVOC'], internet_icon, MAPS_PI_VERSION, nbiot_csq)
             sleep(0.3)
         except Exception as e:
             logger.error(e)
@@ -132,7 +134,7 @@ def wifi_upload_to_lass():
     global sensor_data
 
     pairs = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S").split(' ')
-    msg = f"|gps_lon={0}|gps_lat={0}|s_g8={sensor_data['CO2']}|s_t0={sensor_data['TEMP']}|app={APP_ID}|date={pairs[0]}|s_d0={sensor_data['PM2.5_AE']}|s_h0={sensor_data['HUMI']}|device_id={DEVIDE_ID}|s_gg={sensor_data['TVOC']}|ver_app={MAPS_PI_VERSION}|time={pairs[1]}|MQ"
+    msg = f"|gps_lon={gps_lon}|gps_lat={gps_lat}|s_g8={sensor_data['CO2']}|s_t0={sensor_data['TEMP']}|app={APP_ID}|date={pairs[0]}|s_d0={sensor_data['PM2.5_AE']}|s_h0={sensor_data['HUMI']}|device_id={DEVIDE_ID}|s_gg={sensor_data['TVOC']}|ver_app={MAPS_PI_VERSION}|time={pairs[1]}|MQ"
     logger.info(f'upload message: {msg}')
 
     get_api = f'{LASS_REST_URL}?topic={APP_ID}&device_id={DEVIDE_ID}&key=NoKey&msg={msg}'
@@ -159,13 +161,23 @@ def check_connection(sim7000e_tcp):
 def check_gps_csq(sim7000e_tcp):
     global nbiot_csq
     global nbiot_detected
+    global gps_lat
+    global gps_lon
 
     if(not nbiot_detected):
         return
     if(sim7000e_tcp.network_chkAttach()):
         nbiot_csq = sim7000e_tcp.network_getCsq()
     gps_info = sim7000e_tcp.get_gps_info()
-    logger.info(gps_info)
+    logger.debug(gps_info)
+    gps_info_list = gps_info.split(',')
+    fix_status = gps_info_list[1]
+    if(fix_status == '1'):
+        utc_data = gps_info_list[2]
+        gps_lat = gps_info_list[3]
+        gps_lon = gps_info_list[4]
+        logger.info(f'gps get time: {utc_data}')
+        logger.info(f'gps lat: {gps_lat} , lon: {gps_lon}')
 
 
 if __name__ == '__main__':
