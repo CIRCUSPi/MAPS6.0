@@ -29,7 +29,7 @@ logging.basicConfig(
     # filename='maps6.log',
     format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 class ConnectionState(Enum):
@@ -43,6 +43,7 @@ UPLOAD_INTERVAL = 300  # second
 GET_SENSOR_DATA_INTERVAL = 5  # second
 CHECK_WIFI_INTERVAL = 10  # second
 SAVE_SD_INTERVAL = 60  # second
+REUPLOAD_INTERVAL = 10  # second
 
 # Device config
 DEVIDE_ID = open(
@@ -75,25 +76,27 @@ nbiot_detected = False
 def save_sd_task():
     global sensor_data
 
+    path = "/mnt/SD"
     while(True):
-        sleep(SAVE_SD_INTERVAL)
-        time_pairs = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S").split(' ')
-        # check is SD card is on the board
-        if os.path.exists("/dev/mmcblk2p1"):
-            logger.info("SD exists")
-            sd = listdir('/media/pi/')
-            if(len(sd) > 0):
+        try:
+            sleep(SAVE_SD_INTERVAL)
+            time_pairs = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S").split(' ')
+            # check is SD card is on the board
+            if os.path.exists("/dev/mmcblk2p1"):
+                logger.info("SD exists")
+                #check if path is mountpoint (mounted or not)
+                if(not(os.path.ismount("/mnt/SD"))):
+                    os.system(f'mount -v -t auto /dev/mmcblk2p1 {path}')
                 data_list = [DEVIDE_ID, time_pairs[0], time_pairs[1], sensor_data['TEMP'], sensor_data['HUMI'], sensor_data['PM2.5_AE'],
-                             sensor_data['PM1.0_AE'], sensor_data['PM10.0_AE'], sensor_data['Illuminance'], sensor_data['CO2'],  sensor_data['TVOC']]
+                            sensor_data['PM1.0_AE'], sensor_data['PM10.0_AE'], sensor_data['Illuminance'], sensor_data['CO2'],  sensor_data['TVOC']]
                 data = ','.join([str(d) for d in data_list])
-                try:
-                    with open(f'/media/pi/{sd[0]}/{time_pairs[0]}.csv', 'a+') as f:
-                        f.write(f'{data}\n')
-                    logger.info('Save sensor data to SD Card.')
-                except Exception as e:
-                    logger.error(e)
-        else:
-            logger.info("NO SD card")
+                with open(f'{path}/{time_pairs[0]}.csv', 'a+') as f:
+                    f.write(f'{data}\n')
+                logger.info('Save sensor data to SD Card.')
+            else:
+                logger.info("NO SD card")
+        except Exception as e:
+            logger.error(e)
 
 
 def NBIoT_publish_to_lass(m_mqtt):
@@ -111,15 +114,18 @@ def oled_task():
 
     oled = SSD1306()
     while True:
-        internet_icon = '-'
-        if(connectionState == ConnectionState.WIFI):
-            internet_icon = 'W'
-            nbiot_csq = '-'
-        elif(connectionState == ConnectionState.NBIOT):
-            internet_icon = 'N'
-        oled.display(DEVIDE_ID, sensor_data['TEMP'], sensor_data['HUMI'], sensor_data['PM2.5_AE'], sensor_data['CO2'],
-                     sensor_data['TVOC'], internet_icon, MAPS_PI_VERSION, nbiot_csq)
-        sleep(0.3)
+        try:
+            internet_icon = '-'
+            if(connectionState == ConnectionState.WIFI):
+                internet_icon = 'W'
+                nbiot_csq = '-'
+            elif(connectionState == ConnectionState.NBIOT):
+                internet_icon = 'N'
+            oled.display(DEVIDE_ID, sensor_data['TEMP'], sensor_data['HUMI'], sensor_data['PM2.5_AE'], sensor_data['CO2'],
+                        sensor_data['TVOC'], internet_icon, MAPS_PI_VERSION, nbiot_csq)
+            sleep(0.3)
+        except Exception as e:
+            logger.error(e)
 
 
 def wifi_upload_to_lass():
@@ -159,7 +165,7 @@ def check_gps_csq(sim7000e_tcp):
     if(sim7000e_tcp.network_chkAttach()):
         nbiot_csq = sim7000e_tcp.network_getCsq()
     gps_info = sim7000e_tcp.get_gps_info()
-    logger.debug(gps_info)
+    logger.info(gps_info)
 
 
 if __name__ == '__main__':
@@ -232,6 +238,9 @@ if __name__ == '__main__':
                         logger.info(
                             f'm_mqtt connect result: {m_mqtt.connect()}')
                     result = NBIoT_publish_to_lass(m_mqtt)
+                    if(not result):
+                        publish_timer = perf_counter() + REUPLOAD_INTERVAL
+                        logger.info('Publish failed, try again in 10 seconds.')
                 else:
                     logger.info(
                         'There is no valid network, please check if you can connect to WiFi or NB-IoT')
@@ -243,12 +252,16 @@ if __name__ == '__main__':
                 sensor_data = m_mega2560.get_sensor_all()
                 if(sensor_data['CO2'] == 65535):
                     sensor_data['CO2'] = -1
-                logger.info(sensor_data)
+                logger.info('='*50)
+                for data in sensor_data:
+                    logger.info(f'{data}: {sensor_data[data]}')
+                logger.info('='*50)
 
             # Check WiFi valid
             if(perf_counter() > check_wifi_timer):
                 check_wifi_timer = perf_counter() + CHECK_WIFI_INTERVAL
                 check_connection(m_sim7000e_tcp)
+                check_gps_csq(m_sim7000e_tcp)
         except Exception as e:
             logger.error(e)
         sleep(0.01)

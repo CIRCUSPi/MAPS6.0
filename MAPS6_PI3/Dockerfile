@@ -10,22 +10,21 @@ RUN apt-get update && apt-get install -y \
     libfreetype6-dev \ 
     liblcms2-dev \ 
     libwebp-dev \
-    python3-setuptools  
-#--no-install-recommends
+    python3-setuptools \
+    iputils-ping
 
 RUN pip3 install --no-binary Pillow requests
 RUN pip3 install Adafruit_SSD1306 pyserial
-RUN pip3 install Pillow 
+RUN pip3 install Pillow
+RUN pip3 install six
 
-RUN mkdir /home/MAPS6_MVP
+RUN mkdir /home/MAPS6_NBIOT
 RUN mkdir /mnt/SD
-RUN mkdir /mnt/USB
 
-
-COPY . /home/MAPS6_MVP/
+COPY . /home/MAPS6_NBIOT/
 COPY ARIALUNI.TTF /home/
 
-WORKDIR /home/MAPS6_MVP
+WORKDIR /home/MAPS6_NBIOT
 
 
-CMD python3 PI_test.py
+CMD python3 main.py
