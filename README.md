@@ -1,2 +1,0 @@
-# MAPS6.0_NBIoT
-MAPS6.0_NBIoT
