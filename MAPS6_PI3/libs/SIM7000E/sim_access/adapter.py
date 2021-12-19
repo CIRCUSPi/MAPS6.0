@@ -254,7 +254,7 @@ class MAPS6Adapter(AdapterBase):
                 MAPS_NBIOT_UART_PORT, data))
             if(self.__wait_response(MAPS_UART_TX_RX_CMD)):
                 break
-            logger.info('write error, try again...')
+            logger.error('write error, try again...')
             try_count += 1
             time.sleep(1)
 

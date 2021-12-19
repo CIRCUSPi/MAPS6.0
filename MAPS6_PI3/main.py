@@ -79,6 +79,7 @@ def save_sd_task():
     global sensor_data
 
     path = "/mnt/SD"
+    First_line_data = "Device ID,Date,Time,Temperature,Humidity,PM2.5_AE,PM1.0_AE,PM10.0_AE,Illuminance,CO2,TVOC,longitude,latitude"
     while(True):
         try:
             sleep(SAVE_SD_INTERVAL)
@@ -90,9 +91,18 @@ def save_sd_task():
                 if(not(os.path.ismount("/mnt/SD"))):
                     os.system(f'mount -v -t auto /dev/mmcblk2p1 {path}')
                 data_list = [DEVIDE_ID, time_pairs[0], time_pairs[1], sensor_data['TEMP'], sensor_data['HUMI'], sensor_data['PM2.5_AE'],
-                             sensor_data['PM1.0_AE'], sensor_data['PM10.0_AE'], sensor_data['Illuminance'], sensor_data['CO2'],  sensor_data['TVOC']]
+                             sensor_data['PM1.0_AE'], sensor_data['PM10.0_AE'], sensor_data[
+                                 'Illuminance'], sensor_data['CO2'],  sensor_data['TVOC'],
+                             gps_lon, gps_lat]
                 data = ','.join([str(d) for d in data_list])
-                with open(f'{path}/{time_pairs[0]}.csv', 'a+') as f:
+                create_flag = False
+                filename = f'{path}/{time_pairs[0]}.csv'
+                if(not os.path.isfile(filename)):
+                    create_flag = True
+                with open(filename, 'a+') as f:
+                    if(create_flag):
+                        logger.info(f'Create file: {filename}')
+                        f.write(f'{First_line_data}\n')
                     f.write(f'{data}\n')
                 logger.info('Save sensor data to SD Card.')
             else:
@@ -105,7 +115,10 @@ def NBIoT_publish_to_lass(m_mqtt):
     global sensor_data
 
     pairs = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S").split(' ')
-    msg = f"|gps_lon={gps_lon}|gps_lat={gps_lat}|s_g8={sensor_data['CO2']}|s_t0={sensor_data['TEMP']}|app={APP_ID}|date={pairs[0]}|s_d0={sensor_data['PM2.5_AE']}|s_h0={sensor_data['HUMI']}|device_id={DEVIDE_ID}|s_gg={sensor_data['TVOC']}|ver_app={MAPS_PI_VERSION}|time={pairs[1]}|MQ"
+    msg = f"|s_g8={sensor_data['CO2']}|s_t0={sensor_data['TEMP']}|app={APP_ID}|date={pairs[0]}|s_d0={sensor_data['PM2.5_AE']}|s_h0={sensor_data['HUMI']}|device_id={DEVIDE_ID}|s_gg={sensor_data['TVOC']}|ver_app={MAPS_PI_VERSION}|time={pairs[1]}|MQ"
+    gps_data = f"|gps_lon={gps_lon}|gps_lat={gps_lat}"
+    if(gps_lon != '-' and gps_lat != '-'):
+        msg = gps_data + msg
     logger.info(f'publish message: {msg}')
     return m_mqtt.publish(TOPIC, msg, QOS)
 
@@ -134,15 +147,21 @@ def wifi_upload_to_lass():
     global sensor_data
 
     pairs = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S").split(' ')
-    msg = f"|gps_lon={gps_lon}|gps_lat={gps_lat}|s_g8={sensor_data['CO2']}|s_t0={sensor_data['TEMP']}|app={APP_ID}|date={pairs[0]}|s_d0={sensor_data['PM2.5_AE']}|s_h0={sensor_data['HUMI']}|device_id={DEVIDE_ID}|s_gg={sensor_data['TVOC']}|ver_app={MAPS_PI_VERSION}|time={pairs[1]}|MQ"
+    msg = f"|s_g8={sensor_data['CO2']}|s_t0={sensor_data['TEMP']}|app={APP_ID}|date={pairs[0]}|s_d0={sensor_data['PM2.5_AE']}|s_h0={sensor_data['HUMI']}|device_id={DEVIDE_ID}|s_gg={sensor_data['TVOC']}|ver_app={MAPS_PI_VERSION}|time={pairs[1]}"
+    gps_data = f"|gps_lon={gps_lon}|gps_lat={gps_lat}"
+    if(gps_lon != '-' and gps_lat != '-'):
+        msg = gps_data + msg
     logger.info(f'upload message: {msg}')
 
     get_api = f'{LASS_REST_URL}?topic={APP_ID}&device_id={DEVIDE_ID}&key=NoKey&msg={msg}'
     try:
         result = requests.get(get_api)
         logger.info(f'HTTPS Get Result: {result}')
+        if(result.status_code == 200):
+            return True
     except Exception as e:
         logger.error(e)
+    return False
 
 
 def check_connection(sim7000e_tcp):
@@ -252,7 +271,7 @@ if __name__ == '__main__':
                     result = NBIoT_publish_to_lass(m_mqtt)
                     if(not result):
                         publish_timer = perf_counter() + REUPLOAD_INTERVAL
-                        logger.info('Publish failed, try again in 10 seconds.')
+                        logger.info('Upload failed, try again in 10 seconds.')
                 else:
                     logger.info(
                         'There is no valid network, please check if you can connect to WiFi or NB-IoT')
