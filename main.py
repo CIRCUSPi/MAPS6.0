@@ -27,7 +27,7 @@ from libs.SSD1306.ssd1306 import SSD1306
 logger = logging.getLogger('maps6')
 logging.basicConfig(
     # filename='maps6.log',
-    format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
+    format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s:%(lineno)d - %(funcName)s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S')
 logger.setLevel(logging.INFO)
 
@@ -108,7 +108,7 @@ def save_sd_task():
             else:
                 logger.info("NO SD card")
         except Exception as e:
-            logger.error(e)
+            logger.error(e, exc_info=True)
 
 
 def NBIoT_publish_to_lass(m_mqtt):
@@ -140,7 +140,7 @@ def oled_task():
                          sensor_data['TVOC'], internet_icon, MAPS_PI_VERSION, nbiot_csq)
             sleep(0.3)
         except Exception as e:
-            logger.error(e)
+            logger.error(e, exc_info=True)
 
 
 def wifi_upload_to_lass():
@@ -160,7 +160,7 @@ def wifi_upload_to_lass():
         if(result.status_code == 200):
             return True
     except Exception as e:
-        logger.error(e)
+        logger.error(e, exc_info=True)
     return False
 
 
@@ -260,8 +260,9 @@ if __name__ == '__main__':
                 result = None
                 if(connectionState == ConnectionState.WIFI):  # using WiFi
                     result = wifi_upload_to_lass()
-                    if(m_mqtt.connected()):
-                        m_mqtt.disconnect()
+                    if(nbiot_detected):
+                        if(m_mqtt.connected()):
+                            m_mqtt.disconnect()
                 elif(connectionState == ConnectionState.NBIOT):  # using NBIoT
                     if(not m_mqtt.connected()):
                         logger.info(
@@ -294,5 +295,5 @@ if __name__ == '__main__':
                 check_connection(m_sim7000e_tcp)
                 check_gps_csq(m_sim7000e_tcp)
         except Exception as e:
-            logger.error(e)
+            logger.error(e, exc_info=True)
         sleep(0.01)
