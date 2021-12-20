@@ -269,12 +269,12 @@ if __name__ == '__main__':
                         logger.info(
                             f'm_mqtt connect result: {m_mqtt.connect()}')
                     result = NBIoT_publish_to_lass(m_mqtt)
-                    if(not result):
-                        publish_timer = perf_counter() + REUPLOAD_INTERVAL
-                        logger.info('Upload failed, try again in 10 seconds.')
                 else:
                     logger.info(
                         'There is no valid network, please check if you can connect to WiFi or NB-IoT')
+                if(not result):
+                    publish_timer = perf_counter() + REUPLOAD_INTERVAL
+                    logger.info('Upload failed, try again in 10 seconds.')
                 logger.info(f'upload_to_lass result: {result}')
 
             # Get All Sensor Data
