@@ -14,8 +14,48 @@
 - 自動判斷通訊方式，優先權 WiFi >> NBIoT
 - 連網後自動校正 RTC
 
-## 注意事項
+## How To Build MAPS6_WIFI_NBIoT_V7.0.0.img
+TBD
+
+### 注意事項
 - 此版本只適用MAPS6 Firmware version 1.22版以上
 
+# For USER
+## WiFi 設定方式
+1. 按住MASP6 AP Mode按鈕持續20秒。
+2. 使用行動裝置或筆電連接 WiFi MPAS6_V7.0.0 1.2。
+3. 開啟瀏覽器輸入IP: 10.0.0.1。
+4. 選擇目標WiFi並輸入密碼。
+5. 按下確認鍵後等待MAPS6重新啟動即可連接目標WiFi。
+
+## WiFi & NB-IoT 模式
+網路使用優先權 WiFi > NB-IoT
+
+- ID：裝置ID
+- Date：UTC時間
+- Temp：溫度
+- RH：濕度
+- PM2.5：細懸浮微粒
+- TVOC：揮發性有機物
+- CO2：二氧化碳
+- csq：NBIoT與基地台連接訊號（0~31，建議最低16，推薦20以上）
+- Vx.x.x：版本
+- 右下角：通訊方式（N：NBIoT, W：WiFi, -：無任何網路連接）
+![NBIOT icon](./images/nb.jpg)
+![NBIOT icon](./images/wifi.jpg)
+
+## 雲端資料
+- 進入以下網址查看雲端資料（\<device_id\>替換為機器裝置ID）
+- 資料上傳頻率：五分鐘一次
+
+https://pm25.lass-net.org/grafana/d/airbox_dashboard_v3/airdata?orgId=2&refresh=10s&var-source=MAPS&var-device_id=<device_id>
 
 
+![NBIOT icon](./images/lass.png)
+
+## 本地資料
+- 資料存放在SD卡內。
+- 資料儲存頻率：每分鐘一筆
+
+## GPS
+- GPS訊號需要再室外或窗邊才可順利收到
