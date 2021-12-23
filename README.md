@@ -59,3 +59,6 @@ https://pm25.lass-net.org/grafana/d/airbox_dashboard_v3/airdata?orgId=2&refresh=
 
 ## GPS
 - GPS訊號需要再室外或窗邊才可順利收到
+
+## 其他說明資料
+參考[MAPS6_NTU_Special/book](https://github.com/SCWhite/MAPS6_NTU_Special/tree/master/book)
