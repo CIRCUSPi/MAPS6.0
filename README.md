@@ -12,10 +12,25 @@
 - OLED 加入 NB-IoT 訊號數值（僅在使用NBIoT通訊時顯示，訊號範圍0~31，建議放置在訊號數值大於16的位置）
 - OLED 加入顯示網路連接方式（W(Wifi)/N(NBIoT)/-(無網路)）
 - 自動判斷通訊方式，優先權 WiFi >> NBIoT
-- 連網後自動校正 RTC
+- 連網(WiFi)後自動校正 RTC
+- 移除Docker自動更新功能，避免硬碟空間不足導致運作異常
 
-## How To Build MAPS6_WIFI_NBIoT_V7.0.0.img
-TBD
+## How To Build maps6_v700 Docker Image
+1. Delete old Docker image & container.
+2. Clone this repositories.
+3. Run docker command.
+    - Create Docker Image
+        ``` Shell
+        docker build -t maps6_v700 . --no-cache
+        ```
+    - Create Docker Container
+        ``` Shell
+        docker run -itd --restart unless-stopped \
+            --net=host \
+            --name maps6-nbiot-wifi \
+            --privileged \
+            maps6_v700
+        ```
 
 ## Docker Hub
 [zack1999/maps6_v700](https://hub.docker.com/repository/docker/zack1999/maps6_v700)
@@ -64,4 +79,15 @@ https://pm25.lass-net.org/grafana/d/airbox_dashboard_v3/airdata?orgId=2&refresh=
 - GPS訊號需要再室外或窗邊才可順利收到
 
 ## 其他說明資料
-參考[MAPS6_NTU_Special/book](https://github.com/SCWhite/MAPS6_NTU_Special/tree/master/book)
+- [MAPSV6-使用完全手冊(中英文)](https://maps6-user-guide.gitbook.io/mapsv6-manual-book-zh/)
+- [感測器資料格式](https://maps6-user-guide.gitbook.io/mapsv6-manual-book-zh/zi-liao-ge-shi)
+- [MAPS6_NTU_Special/book](https://github.com/SCWhite/MAPS6_NTU_Special/tree/master/book)
+
+
+## Lass Server MQTT Protocol Config
+- MQTT Broker: 35.162.236.171
+- Port : 8883
+- MQTT ID: Device ID(MAC)
+- Username: maps
+- Password: iisnrl
+- Topic: MAPS/MAPS6/<Device ID(MAC)>
