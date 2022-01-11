@@ -81,6 +81,7 @@ https://pm25.lass-net.org/grafana/d/airbox_dashboard_v3/airdata?orgId=2&refresh=
 ## 其他說明資料
 - [MAPSV6-使用完全手冊(中英文)](https://maps6-user-guide.gitbook.io/mapsv6-manual-book-zh/)
 - [感測器資料格式](https://maps6-user-guide.gitbook.io/mapsv6-manual-book-zh/zi-liao-ge-shi)
+- [PM25 Open Data API](https://app.swaggerhub.com/apis-docs/I2875/PM25_Open_Data/1.0.0)
 - [MAPS6_NTU_Special/book](https://github.com/SCWhite/MAPS6_NTU_Special/tree/master/book)
 
 
