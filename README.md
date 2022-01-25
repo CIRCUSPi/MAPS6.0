@@ -66,10 +66,10 @@
 - 進入以下網址查看雲端資料（\<device_id\>替換為機器裝置ID）
 - 資料上傳頻率：五分鐘一次
 
-https://pm25.lass-net.org/grafana/d/airbox_dashboard_v3/airdata?orgId=2&refresh=10s&var-source=MAPS&var-device_id=<device_id>
+https://pm25.lass-net.org/grafana/d/airbox_dashboard2/airdata-coandvoc?orgId=2&var-device_id=<device_id>
 
 
-![NBIOT icon](./images/lass.png)
+![NBIOT icon](./images/lass_1.png)
 
 ## 本地資料
 - 資料存放在SD卡內。
